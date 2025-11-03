@@ -45,6 +45,24 @@
               <span class="status-value">{{ currentPath }}</span>
             </div>
           </div>
+          <div class="sync-actions">
+            <!-- <button 
+              class="btn-primary" 
+              @click="saveAndSync"
+              :disabled="!basePath || saving"
+            >
+              <RefreshCwIcon v-if="saving" :size="16" class="spinning" />
+              {{ saving ? '保存中...' : '保存并同步' }}
+            </button> -->
+            <button 
+              class="btn-secondary" 
+              @click="testPath"
+              :disabled="!basePath"
+            >
+              <RefreshCwIcon v-if="testing" :size="16" class="spinning" />
+              {{ testing ? '测试中...' : '测试路径' }}
+            </button>
+          </div>
         </div>
 
         <div class="settings-section">
@@ -60,23 +78,7 @@
             </label>
           </div>
           
-          <div class="sync-actions">
-            <button 
-              class="btn-primary" 
-              @click="saveAndSync"
-              :disabled="!basePath || saving"
-            >
-              <RefreshCwIcon v-if="saving" :size="16" class="spinning" />
-              {{ saving ? '保存中...' : '保存并同步' }}
-            </button>
-            <button 
-              class="btn-secondary" 
-              @click="testPath"
-              :disabled="!basePath"
-            >
-              测试路径
-            </button>
-          </div>
+          
         </div>
 
         <div class="settings-section">
@@ -134,6 +136,7 @@ const autoSync = ref(true)
 const autoPlay = ref(true)
 const defaultFavoriteFolder = ref('default')
 const saving = ref(false)
+const testing = ref(false)
 const statusMessage = ref('未配置')
 const statusClass = ref('status-warning')
 
@@ -171,18 +174,17 @@ const browseFolder = () => {
 const testPath = async () => {
   if (!basePath.value) return
   
-  saving.value = true
+  testing.value = true
   try {
     // 这里应该调用后端API测试路径有效性
-    // 暂时模拟成功
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await configApi.testBasePath(basePath.value)
     statusMessage.value = '路径有效'
     statusClass.value = 'status-success'
   } catch (error) {
     statusMessage.value = '路径无效或无法访问'
     statusClass.value = 'status-error'
   } finally {
-    saving.value = false
+    testing.value = false
   }
 }
 
@@ -202,7 +204,7 @@ const saveSettings = async () => {
     
     await configApi.setBasePath(basePath.value)
     
-    statusMessage.value = '路径设置成功，正在同步文件...'
+    statusMessage.value = '路径设置成功'
     currentPath.value = basePath.value
     
     // 保存其他设置到 localStorage
@@ -211,9 +213,9 @@ const saveSettings = async () => {
     localStorage.setItem('audioManager_defaultFavoriteFolder', defaultFavoriteFolder.value)
     
     // 触发同步
-    emit('synced')
+    // emit('synced')
     
-    statusMessage.value = '设置已保存并开始同步'
+    statusMessage.value = '设置已保存'
     statusClass.value = 'status-success'
     
     // 延迟关闭让用户看到成功消息
