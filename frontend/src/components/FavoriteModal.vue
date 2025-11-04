@@ -9,7 +9,11 @@
       </div>
       
       <div class="modal-body">
-        <div class="favorite-folders">
+        <div class="favorite-folders" v-if="isFavorite">
+          <p><b>{{ filename }}</b> 已被收藏在 <b>{{ selectedFolder }}</b></p>
+          <p style="padding-top: 10px;">确定要取消收藏么？</p>
+        </div>
+        <div class="favorite-folders" v-else>
           <h4>选择收藏夹</h4>
           <div class="folders-list">
             <label 
@@ -31,7 +35,7 @@
           </div>
         </div>
         
-        <div class="new-folder-section">
+        <div class="new-folder-section" v-if="!isFavorite">
           <h4>新建收藏夹</h4>
           <div class="new-folder-input">
             <input 
@@ -61,7 +65,7 @@
           @click="confirmFavorite"
           :disabled="!selectedFolder"
         >
-          添加到收藏
+          {{ isFavorite ? '取消收藏' : '添加到收藏' }}
         </button>
       </div>
     </div>
@@ -74,7 +78,9 @@ import { XIcon } from 'lucide-vue-next'
 import { useAudioStore } from '@/store/audio'
 
 interface Props {
-  audioId: string
+  audioId: string,
+  isFavorite: boolean,
+  filename: string,
   currentFolders: string[]
 }
 
@@ -95,7 +101,7 @@ const newFolderName = ref('')
 const availableFolders = computed(() => {
   return audioStore.favoriteFolders.map(folder => ({
     ...folder,
-    count: audioStore.favorites.filter(audio => 
+    count: audioStore.favorites.filter(audio =>
       audio.favoriteFolders.includes(folder.id)
     ).length
   }))

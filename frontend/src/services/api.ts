@@ -57,6 +57,46 @@ export const audioApi = {
   getFavorites: (params?: any) => api.get('/audio/favorites', { params }),
 }
 
+export const authApi = {
+  // 登录
+  login: (credentials: { username: string; password: string }) => 
+    axios.post('/api/auth/login', credentials),
+  
+  // 注册
+  register: (userData: { 
+    username: string; 
+    password: string; 
+    email: string; 
+    phone?: string;
+    ext?: any;
+  }) => 
+    axios.post('/api/auth/register', userData),
+  
+  // 验证 token
+  verifyToken: () => 
+    axios.get('/api/auth/verify', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }),
+  
+  // 获取当前用户
+  getCurrentUser: () => 
+    axios.get('/api/auth/me', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }),
+  
+  // 退出登录
+  logout: () => 
+    axios.post('/api/auth/logout', {}, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }),
+  
+  // 更新用户信息
+  updateProfile: (updates: any) => 
+    axios.put('/api/auth/profile', updates, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+}
+
 // 添加配置 API
 export const configApi = {
   getBasePath: () => api.get('/config/base-path'),

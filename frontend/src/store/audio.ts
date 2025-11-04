@@ -1,9 +1,19 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { AudioFile, FolderItem } from '@/types/audio'
-import { audioApi } from '@/services/api'
+import { audioApi, authApi } from '@/services/api'
 import { audioPlayer } from '@/utils/audioPlayer'
 import { useNotification } from '@/utils/notification'
+import { hashPassword } from '@/utils/password'
+
+// 添加用户类型定义
+interface User {
+  id: string
+  username: string
+  email: string
+  role: string
+  // 可以根据需要添加更多字段
+}
 
 export const useAudioStore = defineStore('audio', () => {
   // State
@@ -20,6 +30,11 @@ export const useAudioStore = defineStore('audio', () => {
   ])
   const currentTheme = ref<'light' | 'dark'>('light')
   const syncLoading = ref(false)
+  
+  // 新增：认证相关状态
+  const isAuthenticated = ref(false)
+  const user = ref<User | null>(null)
+  const authLoading = ref(false)
 
   // Getters
   const filteredAudioList = computed(() => {
@@ -54,6 +69,10 @@ export const useAudioStore = defineStore('audio', () => {
     
     return crumbs
   })
+
+  // 新增：认证相关的 computed
+  const userRole = computed(() => user.value?.role || 'user')
+  const isAdmin = computed(() => userRole.value === 'admin')
 
   // 修复：简化的音频播放器事件监听
   const setupAudioPlayerListeners = () => {
@@ -109,6 +128,95 @@ export const useAudioStore = defineStore('audio', () => {
       audioId: currentPlayingId.value,
       isPlaying: currentPlayingId.value ? audioPlayer.isPlaying(currentPlayingId.value) : false
     }
+  }
+
+  // 新增：认证相关的方法
+  const login = async (credentials: { username: string; password: string }) => {
+    try {
+      authLoading.value = true
+
+      // 在前端对密码进行哈希
+      const frontendHashedPassword = await hashPassword(credentials.password);
+      
+      const response = await authApi.login({
+        username: credentials.username,
+        password: frontendHashedPassword
+      })
+      const { user, token } = response.data
+      console.log(11, user, token)
+      
+      // 保存认证信息
+      isAuthenticated.value = true
+      // user.value = user
+      
+      // 保存到本地存储
+      localStorage.setItem('token', token)
+      localStorage.setItem('user', JSON.stringify(user))
+      
+      showNotification('登录成功', 'success')
+      return { success: true }
+    } catch (error: any) {
+      console.log('Login failed:', error)
+      const errorMsg = error.response?.data?.message || '登录失败'
+      showNotification(errorMsg, 'error')
+      return { success: false, error: errorMsg }
+    } finally {
+      authLoading.value = false
+    }
+  }
+
+  const logout = async () => {
+    try {
+      // 调用登出API（如果有的话）
+      await authApi.logout()
+    } catch (error) {
+      console.error('Logout API error:', error)
+    } finally {
+      // 清理本地状态
+      isAuthenticated.value = false
+      user.value = null
+      
+      // 清理本地存储
+      localStorage.removeItem('user')
+      localStorage.removeItem('token')
+      
+      // 停止当前播放的音频
+      stopAudio()
+      
+      showNotification('已退出登录', 'info')
+    }
+  }
+
+  const checkAuthStatus = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const savedUser = localStorage.getItem('user')
+      
+      if (!token || !savedUser) {
+        return false
+      }
+      
+      // 验证 token 有效性
+      const response = await authApi.verifyToken()
+      
+      if (response.data.success) {
+        user.value = response.data.user
+        isAuthenticated.value = true
+        return true
+      }
+      
+      return false
+    } catch (error) {
+      console.error('Auth check failed:', error)
+      // 验证失败时清理状态
+      logout()
+      return false
+    }
+  }
+
+  // 初始化认证状态
+  const initializeAuth = async () => {
+    await checkAuthStatus()
   }
 
   // Actions
@@ -361,6 +469,8 @@ export const useAudioStore = defineStore('audio', () => {
   };
 
   const initializeAudioStore = async () => {
+    // 初始化认证状态
+    await initializeAuth()
     // 初始化音频播放器监听器
     setupAudioPlayerListeners()
     await loadFolderContents('')
@@ -452,11 +562,20 @@ export const useAudioStore = defineStore('audio', () => {
     favoriteFolders,
     currentTheme,
     syncLoading,
-    currentPlayingId, // 确保导出 currentPlayingId
+    currentPlayingId,
     
+    // 新增：认证相关状态
+    isAuthenticated,
+    user,
+    authLoading,
+
     // Getters
     filteredAudioList,
     breadcrumbs,
+    
+    // 新增：认证相关的 computed
+    userRole,
+    isAdmin,
     
     // Actions
     loadAudioList,
@@ -480,7 +599,13 @@ export const useAudioStore = defineStore('audio', () => {
     playAudio,
     pauseAudio,
     stopAudio,
-    seekAudio, // 新增：导出 seek 方法
-    getCurrentPlayingState // 新增：导出获取播放状态的方法
+    seekAudio,
+    getCurrentPlayingState,
+    
+    // 新增：认证相关方法
+    login,
+    logout,
+    checkAuthStatus,
+    initializeAuth
   }
 })

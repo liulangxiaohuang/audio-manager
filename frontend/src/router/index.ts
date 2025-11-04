@@ -1,31 +1,97 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { useAudioStore } from '@/store/audio'
 
-const routes = [
+// 扩展路由meta类型
+declare module 'vue-router' {
+  interface RouteMeta {
+    layout?: string
+    authRequired?: boolean
+  }
+}
+
+const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    name: 'Folder',
-    component: () => import('@/views/FolderView.vue')
+    component: () => import('@/components/layout/DefaultLayout.vue'),
+    meta: { authRequired: true },
+    children: [
+      {
+        path: '',
+        name: 'Folder',
+        component: () => import('@/views/FolderView.vue')
+      },
+      {
+        path: '/folder/:path*',
+        name: 'FolderPath',
+        component: () => import('@/views/FolderView.vue')
+      },
+      {
+        path: '/favorites',
+        name: 'Favorites',
+        component: () => import('@/views/FavoritesView.vue')
+      }
+    ]
   },
   {
-    path: '/folder/:path*',
-    name: 'FolderPath',
-    component: () => import('@/views/FolderView.vue')
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/components/layout/CleanLayout.vue'),
+    meta: { layout: 'CleanLayout' },
+    children: [
+      {
+        path: '/login',
+        component: () => import('@/views/LoginView.vue')
+      }
+    ]
   },
   {
-    path: '/favorites',
-    name: 'Favorites',
-    component: () => import('@/views/FavoritesView.vue')
+    path: '/admin',
+    name: 'Admin',
+    component: () => import('@/components/layout/AdminLayout.vue'),
+    meta: { layout: 'AdminLayout', authRequired: true },
+    children: [
+      {
+        path: '/admin',
+        component: () => import('@/views/AdminView.vue')
+      }
+    ]
   },
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
-    component: () => import('@/views/NotFoundView.vue')
+    component: () => import('@/components/layout/CleanLayout.vue'),
+    meta: { layout: 'CleanLayout' },
+    children: [
+      {
+        path: '/:pathMatch(.*)*',
+        component: () => import('@/views/NotFoundView.vue')
+      }
+    ]
   }
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// 路由守卫 - 权限检查
+router.beforeEach((to, from, next) => {
+  const audioStore = useAudioStore()
+  
+  // 检查是否需要认证
+  if (to.meta.authRequired && !audioStore.isAuthenticated) {
+    next('/login')
+    return
+  }
+  
+  // 如果已经登录，访问登录页则重定向到首页
+  if (to.name === 'Login' && audioStore.isAuthenticated) {
+    next('/')
+    return
+  }
+  
+  next()
 })
 
 export default router

@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import audioRoutes from './routes/audio.js';
+import authRoutes from './routes/auth.js'
 import configRoutes from './routes/config.js';
 import AudioService from './services/AudioService.js';
 
@@ -18,6 +19,7 @@ app.use('/uploads', express.static('uploads'));
 
 // 路由
 app.use('/api/audio', audioRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/config', configRoutes);
 
 // 初始化

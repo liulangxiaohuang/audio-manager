@@ -47,19 +47,28 @@
         </button>
       </div>
 
-      <button class="sync-button" @click="syncAudio" :disabled="audioStore.syncLoading">
+      <!-- <button class="sync-button" @click="syncAudio" :disabled="audioStore.syncLoading">
         <RefreshCwIcon :size="16" :class="{ spinning: audioStore.syncLoading }" />
         {{ audioStore.syncLoading ? '同步中...' : '同步' }}
-      </button>
+      </button> -->
+      
+      <div class="user-menu" v-if="audioStore.isAuthenticated">
+        <span class="username">{{ audioStore.user?.username }}</span>
+        <!-- <button @click="handleLogout" class="logout-btn">退出登录</button> -->
+        <LogOutIcon :size="16" class="logout-btn" @click="handleLogout" title="退出" />
+      </div>
+      <span v-else @click="handleLogin">Login</span>
     </div>
   </header>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAudioStore } from '@/store/audio'
-import { SearchIcon, XIcon, RefreshCwIcon } from 'lucide-vue-next'
+import { SearchIcon, XIcon, LogOutIcon } from 'lucide-vue-next'
 
+const router = useRouter()
 const audioStore = useAudioStore()
 
 const searchQuery = ref('')
@@ -115,10 +124,6 @@ const navigateTo = (path: string) => {
   audioStore.setCurrentFolder(path)
 }
 
-const syncAudio = () => {
-  audioStore.syncAudioFiles()
-}
-
 // 监听 store 中的搜索查询变化
 watch(() => audioStore.searchQuery, (newQuery) => {
   if (newQuery !== searchQuery.value) {
@@ -126,8 +131,17 @@ watch(() => audioStore.searchQuery, (newQuery) => {
   }
 })
 
+const handleLogin = () => {
+  router.push('/login')
+}
+
+const handleLogout = async () => {
+  await audioStore.logout()
+  // 退出后跳转到登录页
+  router.push('/login')
+}
+
 // 组件卸载时清除定时器
-import { onUnmounted } from 'vue'
 onUnmounted(() => {
   clearTimeout(searchTimeout)
 })
@@ -292,12 +306,21 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.user-menu {
+  margin-left: 15px;
+  display: flex;
 }
-
-.spinning {
-  animation: spin 1s linear infinite;
+.username {
+  color: #333;
+  vertical-align: middle;
+  display: inline-block;
+  line-height: 16px;
+  font-size: 13px;
+}
+.logout-btn {
+  cursor: pointer;
+  margin-left: 10px;
+  color: #333;
+  color: var(--primary-color);
 }
 </style>

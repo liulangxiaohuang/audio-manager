@@ -1,7 +1,10 @@
 <template>
   <aside class="sidebar">
     <div class="sidebar-header">
-      <h2 class="logo">音效管理器</h2>
+      <h2 class="logo" @click="handleBackHome">
+        <img src="@/assets/logo.png">
+        <span>音效管理器</span>
+      </h2>
     </div>
     
     <div class="sidebar-tabs">
@@ -58,11 +61,17 @@
         <SettingsIcon :size="16" />
         设置
       </button>
-      <button class="theme-toggle" @click="toggleTheme">
-        <SunIcon v-if="currentTheme === 'light'" :size="16" />
-        <MoonIcon v-else :size="16" />
-        切换主题
-      </button>
+      <div class="settings-btn-group">
+        <button class="theme-toggle" @click="syncAudio" :disabled="audioStore.syncLoading">
+          <RefreshCwIcon :size="16" :class="{ spinning: audioStore.syncLoading }" />
+          同步
+        </button>
+        <button class="theme-toggle" @click="toggleTheme">
+          <SunIcon v-if="currentTheme === 'light'" :size="16" />
+          <MoonIcon v-else :size="16" />
+          切换主题
+        </button>
+      </div>
     </div>
 
     <SettingsModal 
@@ -77,7 +86,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAudioStore } from '@/store/audio'
-import { FolderIcon, StarIcon, SettingsIcon, SunIcon, MoonIcon } from 'lucide-vue-next'
+import { FolderIcon, StarIcon, SettingsIcon, SunIcon, MoonIcon, RefreshCwIcon } from 'lucide-vue-next'
 import SettingsModal from '@/components/SettingsModal.vue'
 
 const router = useRouter()
@@ -138,8 +147,16 @@ const openSettings = () => {
   showSettings.value = true
 }
 
+const syncAudio = () => {
+  audioStore.syncAudioFiles()
+}
+
 const toggleTheme = () => {
   audioStore.toggleTheme()
+}
+
+const handleBackHome = () => {
+  router.push('/')
 }
 
 const currentTheme = computed(() => audioStore.currentTheme)
@@ -156,8 +173,11 @@ const currentTheme = computed(() => audioStore.currentTheme)
 }
 
 .sidebar-header {
-  padding: 20px;
+  /* padding: 20px; */
+  padding: 0 20px;
+  height: 70px;
   border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
 }
 
 .logo {
@@ -165,6 +185,17 @@ const currentTheme = computed(() => audioStore.currentTheme)
   font-weight: 700;
   color: var(--primary-color);
   margin: 0;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+.logo img {
+  /* width: 69px; */
+  /* width: 100%; */
+  height: 100%;
+}
+.logo span {
+  margin-left: 25px;
 }
 
 .sidebar-tabs {
@@ -273,5 +304,19 @@ const currentTheme = computed(() => audioStore.currentTheme)
 .theme-toggle:hover {
   border-color: var(--primary-color);
   color: var(--primary-color);
+}
+
+.settings-btn-group {
+  display: flex;
+  gap: 15px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
 }
 </style>

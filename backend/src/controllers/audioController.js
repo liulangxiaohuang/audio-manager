@@ -135,14 +135,18 @@ export const toggleFavorite = async (req, res) => {
     if (isInFolder) {
       // 从收藏夹移除
       audio.favoriteFolders = audio.favoriteFolders.filter(f => f !== favoriteFolder);
+      audio.isFavorite = false
     } else {
       // 添加到收藏夹
       audio.favoriteFolders.push(favoriteFolder);
+      audio.isFavorite = true
     }
+
+    console.log(audio)
 
     await audio.save();
     
-    console.log(`Audio ${audio.name} ${isInFolder ? 'removed from' : 'added to'} favorite folder: ${favoriteFolder}`);
+    console.log(`Audio " ${audio.name} " ${isInFolder ? 'removed from' : 'added to'} favorite folder: ${favoriteFolder}`);
     
     res.json({
       ...audio.toObject(),

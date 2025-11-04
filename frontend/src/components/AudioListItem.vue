@@ -100,6 +100,8 @@
     <FavoriteModal 
       v-if="showFavoriteModal"
       :audioId="audio._id"
+      :isFavorite="audio.isFavorite"
+      :filename="audio.name"
       :currentFolders="audio.favoriteFolders"
       @close="showFavoriteModal = false"
       @favorite="handleFavorite"

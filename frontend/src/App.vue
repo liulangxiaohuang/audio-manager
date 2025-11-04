@@ -1,15 +1,7 @@
 <template>
   <div class="app" :class="`theme-${audioStore.currentTheme}`">
-    <div class="app-layout">
-      <Sidebar />
-      <main class="main-content">
-        <Header />
-        <div class="content-area">
-          <RouterView />
-        </div>
-      </main>
-    </div>
-
+    <RouterView />
+    
     <AppNotification />
     
     <SyncModal v-if="audioStore.syncLoading" />
@@ -29,35 +21,37 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { RouterView } from 'vue-router'
-import Sidebar from '@/components/layout/Sidebar.vue'
-import Header from '@/components/layout/Header.vue'
-import SyncModal from '@/components/SyncModal.vue'
-import SettingsModal from '@/components/SettingsModal.vue'
 import { useAudioStore } from '@/store/audio'
 import { configApi } from '@/services/api'
+import SyncModal from '@/components/SyncModal.vue'
+import SettingsModal from '@/components/SettingsModal.vue'
 import AppNotification from '@/components/AppNotification.vue'
 
 const audioStore = useAudioStore()
 const showInitialSettings = ref(false)
 
 onMounted(async () => {
-  // 检查是否已配置基础路径
-  try {
-    const response = await configApi.getBasePath()
-    if (!response.data.basePath) {
-      // 如果没有配置基础路径，显示设置弹窗
+  await audioStore.initializeAuth()
+
+  // 如果用户已登录，再检查基础路径配置
+  if (audioStore.isAuthenticated) {
+    // 检查是否已配置基础路径
+    try {
+      const response = await configApi.getBasePath()
+      if (!response.data.basePath) {
+        // 如果没有配置基础路径，显示设置弹窗
+        showInitialSettings.value = true
+      } else {
+        // 如果已配置，加载数据
+        await audioStore.initializeAudioStore()
+        audioStore.loadFolderStructure()
+        audioStore.loadFavorites()
+      }
+    } catch (error) {
+      console.error('Failed to check config:', error)
+      // 如果检查失败，也显示设置弹窗
       showInitialSettings.value = true
-    } else {
-      // 如果已配置，加载数据
-      await audioStore.initializeAudioStore()
-      audioStore.loadFolderStructure()
-      audioStore.loadFavorites()
     }
-  } catch (error) {
-    console.error('Failed to check config:', error)
-    // 如果检查失败，也显示设置弹窗
-    showInitialSettings.value = true
   }
 })
 </script>

@@ -28,18 +28,18 @@
       </button>
     </div>
 
-    <div class="view-actions" style="display: none;">
+    <div class="view-actions" style="display: block;">
       <div class="view-info">
         <!-- <h2>{{ currentFolderName }}</h2>
         <p v-if="audioStore.currentFolder">路径: {{ audioStore.currentFolder }}</p>
         <p v-else>根目录</p> -->
-        <h2>{{ currentViewTitle }}</h2>
-        <p v-if="audioStore.searchQuery">搜索: "{{ audioStore.searchQuery }}" - 找到 {{ audioFiles.length }} 个结果</p>
-        <p v-else-if="audioStore.currentFolder">路径: {{ audioStore.currentFolder }}</p>
-        <p v-else>根目录</p>
+        <!-- <h2>{{ currentViewTitle }}</h2> -->
+        <!-- <p v-if="audioStore.searchQuery">搜索: "{{ audioStore.searchQuery }}" - 找到 {{ audioFiles.length }} 个结果</p>
+        <p v-else-if="audioStore.currentFolder">路径: {{ audioStore.currentFolder }}</p> -->
+        <!-- <p v-else>根目录</p> -->
       </div>
       
-      <div class="action-buttons">
+      <div class="action-buttons" v-if="audioFiles.length">
         <!-- 多选模式开关 -->
         <button 
           class="btn-secondary" 
@@ -136,6 +136,15 @@
         </button>
       </div>
     </div>
+
+    <ConfirmModal 
+      v-if="showDeleteConfirm"
+      title="删除音频"
+      :message="`确定要删除所选的${selectedAudioCount}个音频吗？此操作不可撤销。`"
+      confirm-text="删除"
+      @close="showDeleteConfirm = false"
+      @confirm="handleDeleteConfirm"
+    />
   </div>
 </template>
 
@@ -154,12 +163,14 @@ import {
   SearchIcon
 } from 'lucide-vue-next'
 import AudioList from '@/components/AudioList.vue'
+import ConfirmModal from '@/components/ConfirmModal.vue'
 import type { AudioFile, FolderItem } from '@/types/audio'
 
 const audioStore = useAudioStore()
 
 const selectedItems = ref<Set<string>>(new Set())
 const multiSelectMode = ref(false)
+const showDeleteConfirm = ref(false)
 
 const folders = computed(() => {
   // 搜索状态下不显示文件夹
@@ -284,24 +295,26 @@ const batchAddToFavorites = () => {
 }
 
 const batchDelete = () => {
-  const audioCount = selectedAudioCount.value
-  if (confirm(`确定要删除选中的 ${audioCount} 个音频文件吗？`)) {
-    selectedItems.value.forEach(audioId => {
-      audioStore.deleteAudio(audioId)
-    })
-    selectedItems.value.clear()
-  }
+  showDeleteConfirm.value = true
 }
 
 const playAudio = (audio: AudioFile) => {
   console.log('播放音频:', audio.name)
   // 实现播放逻辑
 }
+
+const handleDeleteConfirm = () => {
+  selectedItems.value.forEach(audioId => {
+    audioStore.deleteAudio(audioId)
+  })
+  selectedItems.value.clear()
+  showDeleteConfirm.value = false
+}
 </script>
 
 <style scoped>
 .folder-view {
-  padding: 24px;
+  /* padding: 24px; */
 }
 
 .breadcrumb-nav {
