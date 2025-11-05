@@ -524,7 +524,6 @@ onUnmounted(() => {
 
 <style scoped>
 .dashboard {
-  padding: 24px;
   max-width: 1400px;
   margin: 0 auto;
   position: relative;
@@ -648,7 +647,7 @@ onUnmounted(() => {
 
 .chart-card {
   background: var(--card-bg);
-  border-radius: 12px;
+  border-radius: 4px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -690,7 +689,7 @@ onUnmounted(() => {
 
 .recent-audios {
   background: var(--card-bg);
-  border-radius: 12px;
+  border-radius: 4px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
