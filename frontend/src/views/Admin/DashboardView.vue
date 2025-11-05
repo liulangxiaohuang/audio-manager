@@ -726,7 +726,7 @@ onUnmounted(() => {
   justify-content: space-between;
   padding: 12px;
   background: var(--bg-secondary);
-  border-radius: 8px;
+  border-radius: 0px;
   transition: background-color 0.2s;
 }
 
