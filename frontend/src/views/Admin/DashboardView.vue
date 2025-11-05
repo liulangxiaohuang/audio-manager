@@ -753,7 +753,7 @@ onUnmounted(() => {
 
 .audio-meta span {
   padding: 2px 8px;
-  background: var(--bg-primary);
+  /*background: var(--bg-primary);*/
   border-radius: 4px;
 }
 
