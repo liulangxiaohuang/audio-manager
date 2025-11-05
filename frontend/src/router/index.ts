@@ -78,6 +78,13 @@ const router = createRouter({
 // 路由守卫 - 权限检查
 router.beforeEach((to, from, next) => {
   const audioStore = useAudioStore()
+
+  // 如果认证状态尚未初始化，先同步恢复认证状态
+  if (!audioStore.authInitialized) {
+    audioStore.restoreAuthFromStorage()
+  }
+  
+  console.log(1000000, audioStore.isAuthenticated)
   
   // 检查是否需要认证
   if (to.meta.authRequired && !audioStore.isAuthenticated) {

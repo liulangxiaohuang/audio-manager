@@ -68,7 +68,7 @@ const handleLogin = async () => {
   
   if (result.success) {
     // 登录成功，跳转到首页或其他页面
-    router.push('/')
+    router.push({name: 'Folder'})
   } else {
     errorMessage.value = result.error || '登录失败'
   }
@@ -149,9 +149,9 @@ const handleLogin = async () => {
 .error-message {
   margin-top: 1rem;
   padding: 0.75rem;
-  background: var(--error-color);
-  color: white;
+  color: var(--error-color);
   border-radius: 4px;
   text-align: center;
+  font-size: 14px;
 }
 </style>

@@ -57,12 +57,12 @@
     </div>
 
     <div class="sidebar-footer">
-      <button class="settings-button" @click="openSettings">
+      <button class="settings-button" @click="openSettings" v-if="audioStore.isAdmin">
         <SettingsIcon :size="16" />
         设置
       </button>
       <div class="settings-btn-group">
-        <button class="theme-toggle" @click="syncAudio" :disabled="audioStore.syncLoading">
+        <button class="theme-toggle" @click="syncAudio" :disabled="audioStore.syncLoading" v-if="audioStore.isAdmin">
           <RefreshCwIcon :size="16" :class="{ spinning: audioStore.syncLoading }" />
           同步
         </button>
@@ -83,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAudioStore } from '@/store/audio'
 import { FolderIcon, StarIcon, SettingsIcon, SunIcon, MoonIcon, RefreshCwIcon } from 'lucide-vue-next'
@@ -104,6 +104,8 @@ const topLevelFolders = computed(() => {
 const favoriteFolders = computed(() => {
   return audioStore.favoriteFolders
 })
+
+const currentTheme = computed(() => audioStore.currentTheme)
 
 const setActiveTab = (tab: 'folders' | 'favorites') => {
   activeTab.value = tab
@@ -159,7 +161,11 @@ const handleBackHome = () => {
   router.push('/')
 }
 
-const currentTheme = computed(() => audioStore.currentTheme)
+onMounted(() => {
+  if (!audioStore.folderStructure.length) {
+    audioStore.loadFolderStructure()
+  }
+})
 </script>
 
 <style scoped>

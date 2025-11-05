@@ -35,6 +35,7 @@ export const useAudioStore = defineStore('audio', () => {
   const isAuthenticated = ref(false)
   const user = ref<User | null>(null)
   const authLoading = ref(false)
+  const authInitialized = ref(false) // 新增：标记认证是否已初始化
 
   // Getters
   const filteredAudioList = computed(() => {
@@ -142,23 +143,23 @@ export const useAudioStore = defineStore('audio', () => {
         username: credentials.username,
         password: frontendHashedPassword
       })
-      const { user, token } = response.data
+      const { user: userData, token } = response.data
       console.log(11, user, token)
       
       // 保存认证信息
       isAuthenticated.value = true
-      // user.value = user
+      user.value = userData
       
       // 保存到本地存储
       localStorage.setItem('token', token)
-      localStorage.setItem('user', JSON.stringify(user))
+      localStorage.setItem('user', JSON.stringify(userData))
       
-      showNotification('登录成功', 'success')
+      // showNotification('登录成功', 'success')
       return { success: true }
     } catch (error: any) {
       console.log('Login failed:', error)
       const errorMsg = error.response?.data?.message || '登录失败'
-      showNotification(errorMsg, 'error')
+      // showNotification(errorMsg, 'error')
       return { success: false, error: errorMsg }
     } finally {
       authLoading.value = false
@@ -183,7 +184,30 @@ export const useAudioStore = defineStore('audio', () => {
       // 停止当前播放的音频
       stopAudio()
       
-      showNotification('已退出登录', 'info')
+      // showNotification('已退出登录', 'info')
+    }
+  }
+
+  // 新增：从本地存储恢复认证状态
+  const restoreAuthFromStorage = () => {
+    try {
+      const token = localStorage.getItem('token')
+      const userData = localStorage.getItem('user')
+      
+      if (token && userData) {
+        isAuthenticated.value = true
+        user.value = JSON.parse(userData)
+        console.log('✅ 从本地存储恢复认证状态')
+      } else {
+        isAuthenticated.value = false
+        user.value = null
+      }
+    } catch (error) {
+      console.error('恢复认证状态失败:', error)
+      isAuthenticated.value = false
+      user.value = null
+    } finally {
+      authInitialized.value = true
     }
   }
 
@@ -214,9 +238,19 @@ export const useAudioStore = defineStore('audio', () => {
     }
   }
 
-  // 初始化认证状态
+  // 初始化认证状态 - 修改为同步恢复 + 异步验证
   const initializeAuth = async () => {
-    await checkAuthStatus()
+    // 同步从本地存储恢复状态（立即设置，避免路由守卫判断错误）
+    restoreAuthFromStorage()
+    
+    // 异步验证 token 有效性
+    if (isAuthenticated.value) {
+      try {
+        await checkAuthStatus()
+      } catch (error) {
+        console.error('Token验证失败:', error)
+      }
+    }
   }
 
   // Actions
@@ -237,6 +271,7 @@ export const useAudioStore = defineStore('audio', () => {
   const loadFolderStructure = async () => {
     try {
       const response = await audioApi.getFolderStructure()
+      console.log(500000, response)
       folderStructure.value = response.data
     } catch (error) {
       console.error('Failed to load folder structure:', error)
@@ -568,6 +603,7 @@ export const useAudioStore = defineStore('audio', () => {
     isAuthenticated,
     user,
     authLoading,
+    authInitialized, // 新增：导出认证初始化状态
 
     // Getters
     filteredAudioList,
@@ -606,6 +642,7 @@ export const useAudioStore = defineStore('audio', () => {
     login,
     logout,
     checkAuthStatus,
-    initializeAuth
+    initializeAuth,
+    restoreAuthFromStorage // 新增：导出恢复认证方法
   }
 })

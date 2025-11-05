@@ -16,7 +16,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
 import AudioListItem from './AudioListItem.vue'
 import type { AudioFile } from '@/types/audio'
 import { useAudioStore } from '@/store/audio'

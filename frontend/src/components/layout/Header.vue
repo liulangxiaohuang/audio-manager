@@ -46,16 +46,12 @@
           <XIcon :size="16" />
         </button>
       </div>
-
-      <!-- <button class="sync-button" @click="syncAudio" :disabled="audioStore.syncLoading">
-        <RefreshCwIcon :size="16" :class="{ spinning: audioStore.syncLoading }" />
-        {{ audioStore.syncLoading ? '同步中...' : '同步' }}
-      </button> -->
       
       <div class="user-menu" v-if="audioStore.isAuthenticated">
+        <ShieldUserIcon :size="16" v-if="audioStore.isAdmin" />
+        <CircleUserRound :size="16" v-else />
         <span class="username">{{ audioStore.user?.username }}</span>
-        <!-- <button @click="handleLogout" class="logout-btn">退出登录</button> -->
-        <LogOutIcon :size="16" class="logout-btn" @click="handleLogout" title="退出" />
+        <LogOutIcon :size="16" class="logout-btn" @click="handleLogout" />
       </div>
       <span v-else @click="handleLogin">Login</span>
     </div>
@@ -66,7 +62,7 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAudioStore } from '@/store/audio'
-import { SearchIcon, XIcon, LogOutIcon } from 'lucide-vue-next'
+import { SearchIcon, XIcon, LogOutIcon, ShieldUserIcon, CircleUserRound } from 'lucide-vue-next'
 
 const router = useRouter()
 const audioStore = useAudioStore()
@@ -309,18 +305,18 @@ onUnmounted(() => {
 .user-menu {
   margin-left: 15px;
   display: flex;
+  color: #686868;
 }
 .username {
-  color: #333;
   vertical-align: middle;
   display: inline-block;
   line-height: 16px;
   font-size: 13px;
+  margin-left: 3px;
 }
 .logout-btn {
   cursor: pointer;
   margin-left: 10px;
-  color: #333;
   color: var(--primary-color);
 }
 </style>
