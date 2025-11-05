@@ -28,23 +28,43 @@
     </div>
 
     <div class="header-right">
-      <div class="search-box" :class="{ 'active': searchQuery }">
-        <SearchIcon :size="16" />
-        <input 
-          v-model="searchQuery" 
-          type="text" 
-          placeholder="搜索音频名称或标签..." 
-          class="search-input"
-          @input="handleSearchInput"
-          @keyup.enter="performSearch"
-        />
-        <button 
-          v-if="searchQuery" 
-          @click="clearSearch" 
-          class="clear-search"
+      <!-- 修改后的搜索框 -->
+      <div class="search-container">
+        <div 
+          class="search-icon-wrapper"
+          :class="{ 'hidden': isSearchExpanded }"
+          @click="expandSearch"
         >
-          <XIcon :size="16" />
-        </button>
+          <SearchIcon :size="20" class="search-icon" />
+        </div>
+        
+        <div 
+          class="search-box" 
+          :class="{ 
+            'expanded': isSearchExpanded,
+            'collapsing': isCollapsing
+          }"
+        >
+          <SearchIcon :size="16" class="search-box-icon" />
+          <input 
+            ref="searchInput"
+            v-model="searchQuery" 
+            type="text" 
+            placeholder="搜索音频名称或标签..." 
+            class="search-input"
+            @input="handleSearchInput"
+            @keyup.enter="performSearch"
+            @focus="handleFocus"
+            @blur="handleBlur"
+          />
+          <button 
+            v-if="searchQuery" 
+            @click="clearSearch" 
+            class="clear-search"
+          >
+            <XIcon :size="16" />
+          </button>
+        </div>
       </div>
       
       <div class="user-menu" v-if="audioStore.isAuthenticated">
@@ -59,7 +79,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAudioStore } from '@/store/audio'
 import { SearchIcon, XIcon, LogOutIcon, ShieldUserIcon, CircleUserRound } from 'lucide-vue-next'
@@ -68,6 +88,9 @@ const router = useRouter()
 const audioStore = useAudioStore()
 
 const searchQuery = ref('')
+const isSearchExpanded = ref(false)
+const isCollapsing = ref(false)
+const searchInput = ref<HTMLInputElement | null>(null)
 
 const pageTitle = computed(() => {
   if (audioStore.searchQuery) {
@@ -94,6 +117,33 @@ const breadcrumbs = computed(() => {
   return crumbs
 })
 
+// 展开搜索框
+const expandSearch = () => {
+  isSearchExpanded.value = true
+  isCollapsing.value = false
+  nextTick(() => {
+    searchInput.value?.focus()
+  })
+}
+
+// 处理焦点事件
+const handleFocus = () => {
+  isSearchExpanded.value = true
+  isCollapsing.value = false
+}
+
+// 处理失去焦点事件
+const handleBlur = () => {
+  if (!searchQuery.value) {
+    isCollapsing.value = true
+    // 添加延迟让动画完成
+    setTimeout(() => {
+      isSearchExpanded.value = false
+      isCollapsing.value = false
+    }, 300)
+  }
+}
+
 // 处理搜索输入
 const handleSearchInput = () => {
   // 使用防抖，避免频繁搜索
@@ -114,6 +164,10 @@ const performSearch = () => {
 const clearSearch = () => {
   searchQuery.value = ''
   audioStore.clearSearch()
+  // 清空后如果搜索框是展开状态，保持焦点
+  if (isSearchExpanded.value && searchInput.value) {
+    searchInput.value.focus()
+  }
 }
 
 const navigateTo = (path: string) => {
@@ -124,6 +178,10 @@ const navigateTo = (path: string) => {
 watch(() => audioStore.searchQuery, (newQuery) => {
   if (newQuery !== searchQuery.value) {
     searchQuery.value = newQuery
+    // 如果有搜索内容，确保搜索框是展开状态
+    if (newQuery && !isSearchExpanded.value) {
+      isSearchExpanded.value = true
+    }
   }
 })
 
@@ -226,26 +284,90 @@ onUnmounted(() => {
   gap: 12px;
 }
 
-.search-box {
+/* 新的搜索容器样式 */
+.search-container {
   position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  opacity: 1;
+  transform: scale(1);
+}
+.search-icon-wrapper:active {
+  border: 1px solid var(--border-color);
+}
+
+.search-icon-wrapper:hover {
+  background: var(--hover-bg);
+  transform: scale(1.05);
+}
+
+.search-icon-wrapper.hidden {
+  opacity: 0;
+  transform: scale(0);
+  pointer-events: none;
+}
+
+.search-icon {
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+}
+
+.search-icon-wrapper:hover .search-icon {
+  color: var(--primary-color);
+}
+
+/* 搜索框样式 */
+.search-box {
+  position: absolute;
+  right: 0;
   display: flex;
   align-items: center;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: 20px;
   padding: 8px 12px;
-  min-width: 300px;
-  transition: all 0.3s ease;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  opacity: 0;
+  transform: translateX(20px) scale(0.8);
 }
 
-.search-box.active {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+.search-box.expanded {
+  width: 300px;
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  border-radius: 8px;
 }
 
-.search-box svg {
+.search-box.collapsing {
+  transform: translateX(20px) scale(0.8);
+  opacity: 0;
+}
+
+.search-box.expanded .search-box-icon {
+  opacity: 1;
+}
+
+.search-box-icon {
   color: var(--text-secondary);
   margin-right: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease 0.1s;
 }
 
 .search-input {
@@ -255,6 +377,13 @@ onUnmounted(() => {
   outline: none;
   color: var(--text-primary);
   font-size: 14px;
+  min-width: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease 0.1s;
+}
+
+.search-box.expanded .search-input {
+  opacity: 1;
 }
 
 .search-input::placeholder {
@@ -271,6 +400,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0;
+  transition: all 0.2s ease;
+}
+
+.search-box.expanded .clear-search {
+  opacity: 1;
 }
 
 .clear-search:hover {
