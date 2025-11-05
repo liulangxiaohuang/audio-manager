@@ -5,7 +5,8 @@ import { useAudioStore } from '@/store/audio'
 declare module 'vue-router' {
   interface RouteMeta {
     layout?: string
-    authRequired?: boolean
+    authRequired?: boolean,
+    adminReauired?: boolean
   }
 }
 
@@ -46,14 +47,24 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/admin',
-    name: 'Admin',
     component: () => import('@/components/layout/AdminLayout.vue'),
-    meta: { layout: 'AdminLayout', authRequired: true },
+    meta: { layout: 'AdminLayout', authRequired: true, adminReauired: true },
     children: [
       {
         path: '/admin',
-        component: () => import('@/views/AdminView.vue')
-      }
+        name: 'Admin',
+        component: () => import('@/views/Admin/DashboardView.vue')
+      },
+      {
+        path: '/admin/audios',
+        name: 'Audios',
+        component: () => import('@/views/Admin/AudiosView.vue')
+      },
+      {
+        path: '/admin/members',
+        name: 'Members',
+        component: () => import('@/views/Admin/MembersView.vue')
+      },
     ]
   },
   {
@@ -84,10 +95,14 @@ router.beforeEach((to, from, next) => {
     audioStore.restoreAuthFromStorage()
   }
   
-  console.log(1000000, audioStore.isAuthenticated)
-  
   // 检查是否需要认证
   if (to.meta.authRequired && !audioStore.isAuthenticated) {
+    next('/login')
+    return
+  }
+
+  // 检查管理员认证权限
+  if (to.meta.adminReauired && !audioStore.isAdmin) {
     next('/login')
     return
   }

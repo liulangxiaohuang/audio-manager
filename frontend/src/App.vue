@@ -120,6 +120,11 @@ body {
   height: 100%;
 }
 
+.admin-layout {
+  display: flex;
+  height: 100%;
+}
+
 .main-content {
   flex: 1;
   display: flex;

@@ -87,7 +87,7 @@ class AdminInitializer {
         password: frontendHashedPassword, // 使用前端哈希后的密码
         email: userData.email,
         phone: userData.phone || '',
-        role: 'admin',
+        role: userData.userRole,
         ext: {
           isInitialAdmin: true,
           initializedBy: 'init-script',
@@ -155,28 +155,30 @@ class AdminInitializer {
     }
 
     // 检查是否已有管理员
-    const hasAdmin = await this.checkExistingAdmin();
-    if (hasAdmin) {
-      const proceed = await this.question('⚠️  系统中已存在管理员账户，是否继续创建新的管理员？(y/N): ');
-      if (proceed.toLowerCase() !== 'y') {
-        console.log('👋 操作已取消');
-        await this.disconnectDB();
-        rl.close();
-        return;
-      }
-    }
+    // const hasAdmin = await this.checkExistingAdmin();
+    // if (hasAdmin) {
+    //   const proceed = await this.question('⚠️  系统中已存在管理员账户，是否继续创建新的管理员？(y/N): ');
+    //   if (proceed.toLowerCase() !== 'y') {
+    //     console.log('👋 操作已取消');
+    //     await this.disconnectDB();
+    //     rl.close();
+    //     return;
+    //   }
+    // }
 
     // 获取用户输入
     console.log('\n📝 请输入管理员账户信息:');
     
-    const username = await this.question('用户名 (默认: admin): ') || 'admin';
+    const username = await this.question('用户名  (默认: admin): ') || 'admin';
     const password = await this.question('密码 (默认: admin123): ') || 'admin123';
+    const userRole = await this.question('角色      (默认: user) ') || 'user';
     const email = await this.question('邮箱 (默认: admin@example.com): ') || 'admin@example.com';
     const phone = await this.question('联系电话 (可选): ');
 
     console.log('\n📋 确认创建信息:');
     console.log(`   用户名: ${username}`);
     console.log(`   密码: ${'*'.repeat(password.length)}`);
+    console.log(`   角色: ${userRole}`);
     console.log(`   邮箱: ${email}`);
     console.log(`   联系电话: ${phone || '未提供'}`);
 
@@ -188,6 +190,7 @@ class AdminInitializer {
       const success = await this.createAdminUser({
         username,
         password,
+        userRole,
         email,
         phone
       });

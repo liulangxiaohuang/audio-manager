@@ -1,10 +1,8 @@
 <template>
-  <div class="not-found-view">
-    <div class="not-found-content">
-      <h1>Admin</h1>
-      <button class="btn-primary" @click="goHome">
-        返回首页
-      </button>
+  <div class="admin-home-view">
+    <div>
+      members view
+      <h1>sss</h1>
     </div>
   </div>
 </template>

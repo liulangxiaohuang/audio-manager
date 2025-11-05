@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import audioRoutes from './routes/audio.js';
 import authRoutes from './routes/auth.js'
 import configRoutes from './routes/config.js';
+import statsRoutes from './routes/stats.js';
 import AudioService from './services/AudioService.js';
 
 dotenv.config();
@@ -21,6 +22,7 @@ app.use('/uploads', express.static('uploads'));
 app.use('/api/audio', audioRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/config', configRoutes);
+app.use('/api/stats', statsRoutes);
 
 // 初始化
 async function initializeApp() {

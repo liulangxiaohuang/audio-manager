@@ -97,6 +97,44 @@ export const authApi = {
     })
 }
 
+export const statsApi = {
+  // 基础统计
+  count: () => 
+    axios.get('/api/stats', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }),
+
+  // 音频格式分布
+  getFormatDistribution: () => 
+    api.get('/stats/format-distribution', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }),
+  
+  // 音频时长分布
+  getDurationDistribution: () => 
+    api.get('/stats/duration-distribution', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }),
+  
+  // 用户注册趋势
+  getUserRegistrationTrend: (days: number = 30) => 
+    api.get(`/stats/user-registration-trend?days=${days}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }),
+  
+  // 标签统计
+  getTagStats: () => 
+    api.get('/stats/tag-stats', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }),
+  
+  // 最近上传的音频
+  getRecentAudios: (limit: number = 10) => 
+    api.get(`/stats/recent-audios?limit=${limit}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+}
+
 // 添加配置 API
 export const configApi = {
   getBasePath: () => api.get('/config/base-path'),

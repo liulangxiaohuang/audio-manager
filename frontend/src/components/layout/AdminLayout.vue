@@ -1,13 +1,16 @@
 <template>
   <div class="admin-layout">
-    <div>Admin Header (待实现)</div>
-    <main>
-      <RouterView />
+    <Sidebar />
+    <main class="main-content">
+      <Header />
+      <div class="content-area">
+        <RouterView />
+      </div>
     </main>
-    <div>Admin Sidebar (待实现)</div>
   </div>
 </template>
 
 <script setup lang="ts">
-// 后续升级管理界面
+import Sidebar from '@/components/Admin/Sidebar.vue'
+import Header from '@/components/Admin/Header.vue'
 </script>

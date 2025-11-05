@@ -72,6 +72,7 @@
           </button>
           
           <button 
+            v-if="audioStore.isAdmin"
             @click="showEditModal = true" 
             class="action-btn"
             title="编辑"
@@ -80,6 +81,7 @@
           </button>
           
           <button 
+            v-if="audioStore.isAdmin"
             @click="showDeleteConfirm = true" 
             class="action-btn delete-btn"
             title="删除"

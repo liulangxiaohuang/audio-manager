@@ -70,7 +70,14 @@
       <div class="user-menu" v-if="audioStore.isAuthenticated">
         <ShieldUserIcon :size="16" v-if="audioStore.isAdmin" />
         <CircleUserRound :size="16" v-else />
-        <span class="username">{{ audioStore.user?.username }}</span>
+        <span class="username">
+          <template v-if="audioStore.isAdmin">
+            <RouterLink :to="{name: 'Admin'}">{{ audioStore.user?.username }}</RouterLink>
+          </template>
+          <template v-else>
+            {{ audioStore.user?.username }}
+          </template>
+        </span>
         <LogOutIcon :size="16" class="logout-btn" @click="handleLogout" />
       </div>
       <span v-else @click="handleLogin">Login</span>
@@ -448,6 +455,14 @@ onUnmounted(() => {
   line-height: 16px;
   font-size: 13px;
   margin-left: 3px;
+}
+.username a {
+  text-decoration: none;
+  color: #686868;
+  transition: all 0.3;
+}
+.username a:hover {
+  color: #444;
 }
 .logout-btn {
   cursor: pointer;

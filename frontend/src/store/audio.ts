@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { AudioFile, FolderItem } from '@/types/audio'
-import { audioApi, authApi } from '@/services/api'
+import { audioApi, authApi, statsApi } from '@/services/api'
 import { audioPlayer } from '@/utils/audioPlayer'
 import { useNotification } from '@/utils/notification'
 import { hashPassword } from '@/utils/password'
@@ -13,6 +13,45 @@ interface User {
   email: string
   role: string
   // 可以根据需要添加更多字段
+}
+
+// 添加统计相关类型定义
+interface StatsData {
+  userCount: number;
+  audioCount: number;
+  folderCount: number;
+  favoriteCount: number;
+  totalDuration: number;
+}
+
+interface FormatDistribution {
+  name: string;
+  value: number;
+}
+
+interface DurationDistribution {
+  range: string;
+  count: number;
+}
+
+interface UserTrend {
+  dates: string[];
+  counts: number[];
+}
+
+interface TagStat {
+  name: string;
+  value: number;
+}
+
+interface DashboardState {
+  stats: StatsData;
+  formatDistribution: FormatDistribution[];
+  durationDistribution: DurationDistribution[];
+  userTrend: UserTrend;
+  tagStats: TagStat[];
+  recentAudios: AudioFile[];
+  dashboardLoading: boolean;
 }
 
 export const useAudioStore = defineStore('audio', () => {
@@ -36,6 +75,26 @@ export const useAudioStore = defineStore('audio', () => {
   const user = ref<User | null>(null)
   const authLoading = ref(false)
   const authInitialized = ref(false) // 新增：标记认证是否已初始化
+
+  // 新增：仪表盘相关状态
+  const dashboardState = ref<DashboardState>({
+    stats: {
+      userCount: 0,
+      audioCount: 0,
+      folderCount: 0,
+      favoriteCount: 0,
+      totalDuration: 0
+    },
+    formatDistribution: [],
+    durationDistribution: [],
+    userTrend: {
+      dates: [],
+      counts: []
+    },
+    tagStats: [],
+    recentAudios: [],
+    dashboardLoading: false
+  })
 
   // Getters
   const filteredAudioList = computed(() => {
@@ -74,6 +133,15 @@ export const useAudioStore = defineStore('audio', () => {
   // 新增：认证相关的 computed
   const userRole = computed(() => user.value?.role || 'user')
   const isAdmin = computed(() => userRole.value === 'admin')
+
+  // 新增：仪表盘相关的 Getters
+  const dashboardStats = computed(() => dashboardState.value.stats)
+  const dashboardFormatDistribution = computed(() => dashboardState.value.formatDistribution)
+  const dashboardDurationDistribution = computed(() => dashboardState.value.durationDistribution)
+  const dashboardUserTrend = computed(() => dashboardState.value.userTrend)
+  const dashboardTagStats = computed(() => dashboardState.value.tagStats)
+  const dashboardRecentAudios = computed(() => dashboardState.value.recentAudios)
+  const dashboardLoading = computed(() => dashboardState.value.dashboardLoading)
 
   // 修复：简化的音频播放器事件监听
   const setupAudioPlayerListeners = () => {
@@ -271,7 +339,6 @@ export const useAudioStore = defineStore('audio', () => {
   const loadFolderStructure = async () => {
     try {
       const response = await audioApi.getFolderStructure()
-      console.log(500000, response)
       folderStructure.value = response.data
     } catch (error) {
       console.error('Failed to load folder structure:', error)
@@ -523,6 +590,145 @@ export const useAudioStore = defineStore('audio', () => {
     })
   }
 
+  const fetchStats = async (): Promise<StatsData> => {
+    try {
+      const result = await statsApi.count();
+      if (result.data.success) {
+        dashboardState.value.stats = result.data.data;
+        return result.data.data;
+      }
+    } catch (error: any) {
+      console.error('获取统计信息失败:', error);
+      showNotification(error.message, 'error');
+      throw error;
+    }
+  }
+
+  // 新增：获取格式分布
+  const fetchFormatDistribution = async (): Promise<FormatDistribution[]> => {
+    try {
+      const result = await statsApi.getFormatDistribution();
+      if (result.data.code === 200) {
+        dashboardState.value.formatDistribution = result.data.data;
+        return result.data.data;
+      }
+      throw new Error(result.data.message || '获取格式分布失败');
+    } catch (error: any) {
+      console.error('获取格式分布失败:', error);
+      showNotification(error.message, 'error');
+      throw error;
+    }
+  }
+
+  // 新增：获取时长分布
+  const fetchDurationDistribution = async (): Promise<DurationDistribution[]> => {
+    try {
+      const result = await statsApi.getDurationDistribution();
+      if (result.data.code === 200) {
+        dashboardState.value.durationDistribution = result.data.data;
+        return result.data.data;
+      }
+      throw new Error(result.data.message || '获取时长分布失败');
+    } catch (error: any) {
+      console.error('获取时长分布失败:', error);
+      showNotification(error.message, 'error');
+      throw error;
+    }
+  }
+
+  // 新增：获取用户注册趋势
+  const fetchUserTrend = async (days: number = 30): Promise<UserTrend> => {
+    try {
+      const result = await statsApi.getUserRegistrationTrend(days);
+      if (result.data.code === 200) {
+        dashboardState.value.userTrend = result.data.data;
+        return result.data.data;
+      }
+      throw new Error(result.data.message || '获取用户注册趋势失败');
+    } catch (error: any) {
+      console.error('获取用户注册趋势失败:', error);
+      showNotification(error.message, 'error');
+      throw error;
+    }
+  }
+
+  // 新增：获取标签统计
+  const fetchTagStats = async (): Promise<TagStat[]> => {
+    try {
+      const result = await statsApi.getTagStats();
+      if (result.data.code === 200) {
+        dashboardState.value.tagStats = result.data.data;
+        return result.data.data;
+      }
+      throw new Error(result.data.message || '获取标签统计失败');
+    } catch (error: any) {
+      console.error('获取标签统计失败:', error);
+      showNotification(error.message, 'error');
+      throw error;
+    }
+  }
+
+  // 新增：获取最近上传的音频
+  const fetchRecentAudios = async (limit: number = 10): Promise<AudioFile[]> => {
+    try {
+      const result = await statsApi.getRecentAudios(limit);
+      if (result.data.code === 200) {
+        dashboardState.value.recentAudios = result.data.data;
+        return result.data.data;
+      }
+      throw new Error(result.data.message || '获取最近音频失败');
+    } catch (error: any) {
+      console.error('获取最近音频失败:', error);
+      showNotification(error.message, 'error');
+      throw error;
+    }
+  }
+
+  // 新增：获取所有仪表盘数据
+  const fetchDashboardData = async () => {
+    dashboardState.value.dashboardLoading = true;
+    try {
+      await Promise.all([
+        // fetchStats(),
+        fetchFormatDistribution(),
+        fetchDurationDistribution(),
+        fetchUserTrend(),
+        fetchTagStats(),
+        fetchRecentAudios(8)
+      ]);
+    } catch (error) {
+      console.error('获取仪表盘数据失败:', error);
+    } finally {
+      dashboardState.value.dashboardLoading = false;
+    }
+  }
+
+  // 新增：刷新仪表盘数据
+  const refreshDashboard = async () => {
+    return await fetchDashboardData();
+  }
+
+  // 格式化时长工具函数
+  const formatDuration = (seconds: number): string => {
+    if (!seconds) return '0秒'
+    
+    const hours = Math.floor(seconds / 3600)
+    // const minutes = Math.floor((seconds % 3600) / 60)
+    // const secs = seconds % 60
+ 
+    return hours * 60
+  }
+
+  const formatAudioDuration = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${minutes}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const formatTime = (timestamp: string): string => {
+    return new Date(timestamp).toLocaleDateString('zh-CN')
+  }
+
   // 模拟数据函数（保持不变）
   const getMockAudioData = (): AudioFile[] => {
     return [
@@ -612,6 +818,15 @@ export const useAudioStore = defineStore('audio', () => {
     // 新增：认证相关的 computed
     userRole,
     isAdmin,
+
+    // 仪表盘相关的 Getters
+    dashboardStats,
+    dashboardFormatDistribution,
+    dashboardDurationDistribution,
+    dashboardUserTrend,
+    dashboardTagStats,
+    dashboardRecentAudios,
+    dashboardLoading,
     
     // Actions
     loadAudioList,
@@ -643,6 +858,23 @@ export const useAudioStore = defineStore('audio', () => {
     logout,
     checkAuthStatus,
     initializeAuth,
-    restoreAuthFromStorage // 新增：导出恢复认证方法
+    restoreAuthFromStorage, // 新增：导出恢复认证方法
+
+    // 新增：统计相关方法
+    fetchStats,
+
+    // 仪表盘相关方法
+    fetchFormatDistribution,
+    fetchDurationDistribution,
+    fetchUserTrend,
+    fetchTagStats,
+    fetchRecentAudios,
+    fetchDashboardData,
+    refreshDashboard,
+
+    // 格式化工具函数
+    formatDuration,
+    formatAudioDuration,
+    formatTime
   }
 })
