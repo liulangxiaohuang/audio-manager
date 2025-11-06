@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { AudioFile, FolderItem } from '@/types/audio'
-import { audioApi, authApi, statsApi } from '@/services/api'
+import { audioApi, authApi, statsApi, favoriteFolderApi, tagApi } from '@/services/api'
 import { audioPlayer } from '@/utils/audioPlayer'
 import { useNotification } from '@/utils/notification'
 import { hashPassword } from '@/utils/password'
@@ -13,6 +13,23 @@ interface User {
   email: string
   role: string
   // 可以根据需要添加更多字段
+}
+
+interface UserFavoriteFolder {
+  _id: string;
+  name: string;
+  description: string;
+  color: string;
+  isDefault: boolean;
+  order: number;
+  audioCount: number;
+  createdAt: string;
+}
+
+interface UserAudioTag {
+  _id: string;
+  tag: string;
+  createdAt: string;
 }
 
 // 添加统计相关类型定义
@@ -71,6 +88,9 @@ export const useAudioStore = defineStore('audio', () => {
   ])
   const currentTheme = ref<'light' | 'dark'>('light')
   const syncLoading = ref(false)
+
+  const userFavoriteFolders = ref<UserFavoriteFolder[]>([])
+  const audioTags = ref<{[audioId: string]: UserAudioTag[]}>({})
   
   // 新增：认证相关状态
   const isAuthenticated = ref(false)
@@ -133,6 +153,9 @@ export const useAudioStore = defineStore('audio', () => {
     
     return crumbs
   })
+
+  const getUserFavoriteFolders = computed(() => userFavoriteFolders.value)
+  const getAudioTags = computed(() => (audioId: string) => audioTags.value[audioId] || [])
 
   // 新增：认证相关的 computed
   const userRole = computed(() => user.value?.role || 'user')
@@ -202,6 +225,78 @@ export const useAudioStore = defineStore('audio', () => {
     return {
       audioId: currentPlayingId.value,
       isPlaying: currentPlayingId.value ? audioPlayer.isPlaying(currentPlayingId.value) : false
+    }
+  }
+
+  const fetchUserFavoriteFolders = async (): Promise<UserFavoriteFolder[]> => {
+    try {
+      const response = await favoriteFolderApi.getMyFolders()
+      userFavoriteFolders.value = response.data
+      return response.data
+    } catch (error: any) {
+      console.error('获取收藏夹失败:', error)
+      showNotification(error.message, 'error')
+      throw error
+    }
+  }
+
+  const createFavoriteFolder = async (data: { name: string; description?: string; color?: string }): Promise<UserFavoriteFolder> => {
+    try {
+      const response = await favoriteFolderApi.createFolder(data)
+      await fetchUserFavoriteFolders() // 刷新列表
+      showNotification('收藏夹创建成功', 'success')
+      return response.data.folder
+    } catch (error: any) {
+      console.error('创建收藏夹失败:', error)
+      showNotification(error.message, 'error')
+      throw error
+    }
+  }
+
+  const fetchFolderAudios = async (folderId: string): Promise<{folder: UserFavoriteFolder, audios: AudioFile[]}> => {
+    try {
+      const response = await favoriteFolderApi.getFolderAudios(folderId)
+      return response.data
+    } catch (error: any) {
+      console.error('获取收藏夹音频失败:', error)
+      showNotification(error.message, 'error')
+      throw error
+    }
+  }
+
+  const fetchAudioTags = async (audioId: string): Promise<UserAudioTag[]> => {
+    try {
+      const response = await tagApi.getAudioTags(audioId)
+      audioTags.value[audioId] = response.data
+      return response.data
+    } catch (error: any) {
+      console.error('获取音频标签失败:', error)
+      throw error
+    }
+  }
+
+  const addAudioTag = async (audioId: string, tag: string): Promise<UserAudioTag> => {
+    try {
+      const response = await tagApi.addTag(audioId, tag)
+      await fetchAudioTags(audioId) // 刷新标签列表
+      showNotification('标签添加成功', 'success')
+      return response.data.tag
+    } catch (error: any) {
+      console.error('添加标签失败:', error)
+      showNotification(error.message, 'error')
+      throw error
+    }
+  }
+
+  const removeAudioTag = async (audioId: string, tagId: string): Promise<void> => {
+    try {
+      await tagApi.removeTag(audioId, tagId)
+      await fetchAudioTags(audioId) // 刷新标签列表
+      showNotification('标签移除成功', 'success')
+    } catch (error: any) {
+      console.error('移除标签失败:', error)
+      showNotification(error.message, 'error')
+      throw error
     }
   }
 
@@ -844,6 +939,9 @@ export const useAudioStore = defineStore('audio', () => {
     currentTheme,
     syncLoading,
     currentPlayingId,
+
+    userFavoriteFolders,
+    audioTags,
     
     // 新增：认证相关状态
     isAuthenticated,
@@ -854,6 +952,9 @@ export const useAudioStore = defineStore('audio', () => {
     // Getters
     filteredAudioList,
     breadcrumbs,
+
+    getUserFavoriteFolders,
+    getAudioTags,
     
     // 新增：认证相关的 computed
     userRole,
@@ -894,6 +995,13 @@ export const useAudioStore = defineStore('audio', () => {
     stopAudio,
     seekAudio,
     getCurrentPlayingState,
+
+    fetchUserFavoriteFolders,
+    createFavoriteFolder,
+    fetchFolderAudios,
+    fetchAudioTags,
+    addAudioTag,
+    removeAudioTag,
     
     // 新增：认证相关方法
     login,

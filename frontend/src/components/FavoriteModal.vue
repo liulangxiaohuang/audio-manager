@@ -2,40 +2,43 @@
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>添加到收藏夹</h3>
+        <h3>管理收藏</h3>
         <button class="close-button" @click="$emit('close')">
           <XIcon :size="20" />
         </button>
       </div>
       
       <div class="modal-body">
-        <div class="favorite-folders" v-if="isFavorite">
-          <p><b>{{ filename }}</b> 已被收藏在 <b>{{ selectedFolder }}</b></p>
-          <p style="padding-top: 10px;">确定要取消收藏么？</p>
+        <div class="current-status" v-if="currentFavorite">
+          <p><b>{{ filename }}</b> 已收藏在 <b>{{ currentFavorite.folder.name }}</b></p>
         </div>
-        <div class="favorite-folders" v-else>
+        
+        <div class="favorite-folders">
           <h4>选择收藏夹</h4>
           <div class="folders-list">
             <label 
               v-for="folder in availableFolders" 
-              :key="folder.id"
+              :key="folder._id"
               class="folder-radio"
+              :class="{ disabled: folder._id === currentFavorite?.folder?._id }"
             >
               <input 
                 type="radio" 
-                :value="folder.id"
+                :value="folder._id"
                 v-model="selectedFolder"
+                :disabled="folder._id === currentFavorite?.folder?._id"
               />
               <span class="radio-checkmark"></span>
+              <div class="folder-color" :style="{ backgroundColor: folder.color }"></div>
               <div class="folder-info">
                 <span class="folder-name">{{ folder.name }}</span>
-                <span class="folder-count">{{ folder.count }} 个音频</span>
+                <span class="folder-count">{{ folder.audioCount }} 个音频</span>
               </div>
             </label>
           </div>
         </div>
         
-        <div class="new-folder-section" v-if="!isFavorite">
+        <div class="new-folder-section">
           <h4>新建收藏夹</h4>
           <div class="new-folder-input">
             <input 
@@ -57,15 +60,25 @@
       </div>
       
       <div class="modal-footer">
-        <button class="btn-secondary" @click="$emit('close')">
+        <button 
+          class="btn-danger" 
+          @click="removeFavorite"
+          v-if="currentFavorite"
+          :disabled="loading"
+        >
+          <Trash2Icon :size="16" />
+          取消收藏
+        </button>
+        <button class="btn-secondary" @click="$emit('close')" :disabled="loading">
           取消
         </button>
         <button 
           class="btn-primary" 
           @click="confirmFavorite"
-          :disabled="!selectedFolder"
+          :disabled="!selectedFolder || loading || selectedFolder === currentFavorite?.folder?._id"
         >
-          {{ isFavorite ? '取消收藏' : '添加到收藏' }}
+          <StarIcon :size="16" />
+          {{ currentFavorite ? '移动到收藏夹' : '添加到收藏' }}
         </button>
       </div>
     </div>
@@ -74,70 +87,95 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { XIcon } from 'lucide-vue-next'
+import { XIcon, StarIcon, Trash2Icon } from 'lucide-vue-next'
 import { useAudioStore } from '@/store/audio'
 
 interface Props {
   audioId: string,
-  isFavorite: boolean,
   filename: string,
-  currentFolders: string[]
+  currentFavorite?: any
 }
 
 interface Emits {
   (e: 'close'): void
   (e: 'favorite', folderId: string): void
-  (e: 'create-folder', folderName: string): void
+  (e: 'unfavorite'): void
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const audioStore = useAudioStore()
-const selectedFolder = ref('default')
+const selectedFolder = ref('')
 const newFolderName = ref('')
+const loading = ref(false)
 
 // 可用的收藏夹列表
 const availableFolders = computed(() => {
-  return audioStore.favoriteFolders.map(folder => ({
-    ...folder,
-    count: audioStore.favorites.filter(audio =>
-      audio.favoriteFolders.includes(folder.id)
-    ).length
-  }))
+  return audioStore.getUserFavoriteFolders
 })
 
 onMounted(() => {
-  // 如果音频已经在某个收藏夹中，默认选中第一个收藏夹
-  if (props.currentFolders.length > 0) {
-    selectedFolder.value = props.currentFolders[0]
+  // 如果音频已经在某个收藏夹中，默认选中该收藏夹
+  if (props.currentFavorite) {
+    selectedFolder.value = props.currentFavorite.folder._id
+  } else if (availableFolders.value.length > 0) {
+    // 否则选中第一个收藏夹
+    selectedFolder.value = availableFolders.value[0]._id
   }
 })
 
-const createNewFolder = () => {
+const createNewFolder = async () => {
   if (!newFolderName.value.trim()) return
   
-  const newFolder = {
-    id: newFolderName.value.trim().toLowerCase().replace(/\s+/g, '-'),
-    name: newFolderName.value.trim(),
-    count: 0
+  try {
+    const newFolder = await audioStore.createFavoriteFolder({
+      name: newFolderName.value.trim(),
+      description: '',
+      color: getRandomColor()
+    })
+    
+    // 选中新创建的收藏夹
+    selectedFolder.value = newFolder._id
+    
+    // 清空输入框
+    newFolderName.value = ''
+  } catch (error) {
+    // 错误处理已经在 store 中完成
   }
-  
-  // 添加到收藏夹列表
-  audioStore.favoriteFolders.push(newFolder)
-  
-  // 选中新创建的收藏夹
-  selectedFolder.value = newFolder.id
-  
-  // 清空输入框
-  newFolderName.value = ''
-  
-  emit('create-folder', newFolder.name)
 }
 
-const confirmFavorite = () => {
-  emit('favorite', selectedFolder.value)
-  emit('close')
+const confirmFavorite = async () => {
+  if (!selectedFolder.value) return
+  
+  loading.value = true
+  try {
+    emit('favorite', selectedFolder.value)
+    emit('close')
+  } finally {
+    loading.value = false
+  }
+}
+
+const removeFavorite = async () => {
+  if (!confirm('确定要取消收藏这个音频吗？')) return
+  
+  loading.value = true
+  try {
+    emit('unfavorite')
+    emit('close')
+  } finally {
+    loading.value = false
+  }
+}
+
+// 生成随机颜色
+const getRandomColor = () => {
+  const colors = [
+    '#007bff', '#28a745', '#dc3545', '#ffc107', '#6f42c1',
+    '#e83e8c', '#fd7e14', '#20c997', '#17a2b8', '#6c757d'
+  ]
+  return colors[Math.floor(Math.random() * colors.length)]
 }
 </script>
 
@@ -204,6 +242,19 @@ const confirmFavorite = () => {
   overflow-y: auto;
 }
 
+.current-status {
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.current-status p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
 .favorite-folders h4,
 .new-folder-section h4 {
   font-size: 14px;
@@ -230,9 +281,15 @@ const confirmFavorite = () => {
   transition: all 0.3s ease;
 }
 
-.folder-radio:hover {
+.folder-radio:hover:not(.disabled) {
   border-color: var(--primary-color);
   background: var(--hover-bg);
+}
+
+.folder-radio.disabled {
+  background: var(--bg-secondary);
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .folder-radio input {
@@ -249,12 +306,12 @@ const confirmFavorite = () => {
   flex-shrink: 0;
 }
 
-.folder-radio input:checked + .radio-checkmark {
+.folder-radio:not(.disabled) input:checked + .radio-checkmark {
   border-color: var(--primary-color);
   background: var(--primary-color);
 }
 
-.folder-radio input:checked + .radio-checkmark::after {
+.folder-radio:not(.disabled) input:checked + .radio-checkmark::after {
   content: '';
   position: absolute;
   left: 4px;
@@ -263,6 +320,13 @@ const confirmFavorite = () => {
   height: 6px;
   background: white;
   border-radius: 50%;
+}
+
+.folder-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .folder-info {
@@ -300,13 +364,17 @@ const confirmFavorite = () => {
 }
 
 .btn-primary,
-.btn-secondary {
+.btn-secondary,
+.btn-danger {
   padding: 8px 16px;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
   transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .btn-primary {
@@ -329,8 +397,23 @@ const confirmFavorite = () => {
   border: 1px solid var(--border-color);
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover:not(:disabled) {
   background: var(--hover-bg);
   border-color: var(--text-secondary);
+}
+
+.btn-danger {
+  background: #dc3545;
+  color: white;
+  margin-right: auto;
+}
+
+.btn-danger:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

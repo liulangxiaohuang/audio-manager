@@ -42,17 +42,53 @@
       </div>
 
       <div v-else class="favorites-list">
+        <!-- 收藏夹列表 -->
         <div 
-          v-for="favFolder in favoriteFolders" 
-          :key="favFolder.id"
+          v-for="favFolder in audioStore.getUserFavoriteFolders" 
+          :key="favFolder._id"
           class="favorite-item"
-          :class="{ active: currentFavorite === favFolder.id }"
-          @click="selectFavorite(favFolder.id)"
+          :class="{ active: currentFavorite === favFolder._id }"
+          @click="selectFavorite(favFolder._id)"
         >
-          <StarIcon :size="16" />
+          <div class="folder-color" :style="{ backgroundColor: favFolder.color }"></div>
           <span class="favorite-name">{{ favFolder.name }}</span>
-          <span class="favorite-count">{{ favFolder.count }}</span>
+          <span class="favorite-count">{{ favFolder.audioCount }}</span>
+          <div class="favorite-actions" v-if="!favFolder.isDefault">
+            <button class="action-button" @click.stop="editFolder(favFolder)">
+              <EditIcon :size="12" />
+            </button>
+            <button class="action-button" @click.stop="deleteFolder(favFolder._id)">
+              <Trash2Icon :size="12" />
+            </button>
+          </div>
         </div>
+
+        <!-- 创建新收藏夹 -->
+        <div class="create-folder-section" v-if="showCreateFolder">
+          <input 
+            v-model="newFolderName" 
+            type="text" 
+            placeholder="收藏夹名称"
+            class="folder-input"
+            @keyup.enter="createFolder"
+            @keyup.esc="cancelCreateFolder"
+            ref="folderInput"
+          />
+          <div class="create-actions">
+            <button class="action-button confirm" @click="createFolder">
+              <CheckIcon :size="12" />
+            </button>
+            <button class="action-button cancel" @click="cancelCreateFolder">
+              <XIcon :size="12" />
+            </button>
+          </div>
+        </div>
+
+        <!-- 添加收藏夹按钮 -->
+        <button class="add-folder-btn" @click="startCreateFolder" v-if="!showCreateFolder">
+          <PlusIcon :size="16" />
+          新建收藏夹
+        </button>
       </div>
     </div>
 
@@ -79,14 +115,65 @@
       @close="showSettings = false"
       @synced="audioStore.syncAudioFiles()"
     />
+
+    <!-- 编辑收藏夹对话框 -->
+    <div v-if="showEditDialog" class="modal-overlay" @click.self="closeEditDialog">
+      <div class="modal-content small">
+        <div class="modal-header">
+          <h3>编辑收藏夹</h3>
+          <button class="close-button" @click="closeEditDialog">
+            <XIcon :size="20" />
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>收藏夹名称</label>
+            <input v-model="editFolderData.name" type="text" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>描述</label>
+            <input v-model="editFolderData.description" type="text" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label>颜色</label>
+            <div class="color-picker">
+              <div 
+                v-for="color in colorOptions" 
+                :key="color"
+                class="color-option"
+                :class="{ active: editFolderData.color === color }"
+                :style="{ backgroundColor: color }"
+                @click="editFolderData.color = color"
+              ></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="closeEditDialog">取消</button>
+          <button class="btn-primary" @click="saveFolderEdit">保存</button>
+        </div>
+      </div>
+    </div>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAudioStore } from '@/store/audio'
-import { FolderIcon, StarIcon, SettingsIcon, SunIcon, MoonIcon, RefreshCwIcon } from 'lucide-vue-next'
+import { 
+  FolderIcon, 
+  StarIcon, 
+  SettingsIcon, 
+  SunIcon, 
+  MoonIcon, 
+  RefreshCwIcon,
+  EditIcon,
+  Trash2Icon,
+  PlusIcon,
+  CheckIcon,
+  XIcon
+} from 'lucide-vue-next'
 import SettingsModal from '@/components/SettingsModal.vue'
 
 const router = useRouter()
@@ -94,25 +181,39 @@ const audioStore = useAudioStore()
 
 const activeTab = ref<'folders' | 'favorites'>('folders')
 const currentFolder = ref('')
-const currentFavorite = ref('default')
+const currentFavorite = ref('')
 const showSettings = ref(false)
+const showCreateFolder = ref(false)
+const newFolderName = ref('')
+const folderInput = ref<HTMLInputElement | null>(null)
+const showEditDialog = ref(false)
+const editingFolder = ref<any>(null)
+
+// 编辑数据
+const editFolderData = ref({
+  name: '',
+  description: '',
+  color: '#007bff'
+})
+
+// 颜色选项
+const colorOptions = [
+  '#007bff', '#28a745', '#dc3545', '#ffc107', '#6f42c1',
+  '#e83e8c', '#fd7e14', '#20c997', '#17a2b8', '#6c757d'
+]
 
 const topLevelFolders = computed(() => {
   return audioStore.folderStructure.filter(item => item.type === 'folder')
 })
 
-const favoriteFolders = computed(() => {
-  return audioStore.favoriteFolders
-})
-
 const currentTheme = computed(() => audioStore.currentTheme)
 
-const setActiveTab = (tab: 'folders' | 'favorites') => {
+const setActiveTab = async (tab: 'folders' | 'favorites') => {
   activeTab.value = tab
   if (tab === 'favorites') {
+    // 加载用户收藏夹
+    await audioStore.fetchUserFavoriteFolders()
     // 切换到收藏夹视图
-    audioStore.loadFavorites()
-    // 更新路由或状态以显示收藏夹内容
     router.push('/favorites')
   } else {
     // 切换到文件夹视图
@@ -128,18 +229,103 @@ const selectFolder = (folderPath: string) => {
   router.push('/')
 }
 
-const selectFavorite = (favoriteId: string) => {
-  currentFavorite.value = favoriteId
-  audioStore.loadFavorites(favoriteId === 'all' ? undefined : favoriteId)
+const selectFavorite = (folderId: string) => {
+  currentFavorite.value = folderId
   // 确保切换到收藏夹视图
   activeTab.value = 'favorites'
-  router.push('/favorites')
+  router.push(`/favorites/${folderId}`)
+}
+
+// 开始创建收藏夹
+const startCreateFolder = () => {
+  showCreateFolder.value = true
+  newFolderName.value = ''
+  nextTick(() => {
+    if (folderInput.value) {
+      folderInput.value.focus()
+    }
+  })
+}
+
+// 取消创建收藏夹
+const cancelCreateFolder = () => {
+  showCreateFolder.value = false
+  newFolderName.value = ''
+}
+
+// 创建收藏夹
+const createFolder = async () => {
+  if (!newFolderName.value.trim()) return
+  
+  try {
+    await audioStore.createFavoriteFolder({
+      name: newFolderName.value.trim(),
+      description: '',
+      color: colorOptions[Math.floor(Math.random() * colorOptions.length)]
+    })
+    showCreateFolder.value = false
+    newFolderName.value = ''
+  } catch (error) {
+    // 错误处理已经在 store 中完成
+  }
+}
+
+// 编辑收藏夹
+const editFolder = (folder: any) => {
+  editingFolder.value = folder
+  editFolderData.value = {
+    name: folder.name,
+    description: folder.description || '',
+    color: folder.color
+  }
+  showEditDialog.value = true
+}
+
+// 关闭编辑对话框
+const closeEditDialog = () => {
+  showEditDialog.value = false
+  editingFolder.value = null
+}
+
+// 保存收藏夹编辑
+const saveFolderEdit = async () => {
+  if (!editFolderData.value.name.trim()) return
+  
+  try {
+    // 这里需要添加更新收藏夹的 store 方法
+    // await audioStore.updateFavoriteFolder(editingFolder.value._id, editFolderData.value)
+    showEditDialog.value = false
+    editingFolder.value = null
+  } catch (error) {
+    console.error('更新收藏夹失败:', error)
+  }
+}
+
+// 删除收藏夹
+const deleteFolder = async (folderId: string) => {
+  if (!confirm('确定要删除这个收藏夹吗？此操作不可恢复。')) return
+  
+  try {
+    // 这里需要添加删除收藏夹的 store 方法
+    // await audioStore.deleteFavoriteFolder(folderId)
+    // 如果当前选中的是这个收藏夹，重置选中状态
+    if (currentFavorite.value === folderId) {
+      currentFavorite.value = ''
+    }
+  } catch (error) {
+    console.error('删除收藏夹失败:', error)
+  }
 }
 
 // 监听路由变化，同步活动标签
 watch(() => router.currentRoute.value.path, (path) => {
-  if (path === '/favorites') {
+  if (path.startsWith('/favorites')) {
     activeTab.value = 'favorites'
+    // 从路由中提取收藏夹ID
+    const match = path.match(/\/favorites\/(.+)/)
+    if (match) {
+      currentFavorite.value = match[1]
+    }
   } else {
     activeTab.value = 'folders'
   }
@@ -161,10 +347,13 @@ const handleBackHome = () => {
   router.push('/')
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (!audioStore.folderStructure.length) {
     audioStore.loadFolderStructure()
   }
+  
+  // 加载用户收藏夹
+  await audioStore.fetchUserFavoriteFolders()
 })
 </script>
 
@@ -179,7 +368,6 @@ onMounted(() => {
 }
 
 .sidebar-header {
-  /* padding: 20px; */
   padding: 0 20px;
   height: 70px;
   border-bottom: 1px solid var(--border-color);
@@ -196,8 +384,6 @@ onMounted(() => {
   height: 100%;
 }
 .logo img {
-  /* width: 69px; */
-  /* width: 100%; */
   height: 100%;
 }
 .logo span {
@@ -254,6 +440,7 @@ onMounted(() => {
   cursor: pointer;
   transition: all 0.3s ease;
   margin-bottom: 4px;
+  position: relative;
 }
 
 .folder-item:hover,
@@ -280,6 +467,101 @@ onMounted(() => {
   padding: 2px 8px;
   border-radius: 12px;
   font-size: 12px;
+}
+
+/* 收藏夹特定样式 */
+.folder-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.favorite-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.favorite-item:hover .favorite-actions {
+  opacity: 1;
+}
+
+.action-button {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.3s ease;
+}
+
+.action-button:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
+}
+
+.action-button.confirm {
+  color: #28a745;
+}
+
+.action-button.cancel {
+  color: #dc3545;
+}
+
+/* 创建收藏夹区域 */
+.create-folder-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  margin-bottom: 8px;
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+}
+
+.folder-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+}
+
+.folder-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.create-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.add-folder-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  font-size: 14px;
+}
+
+.add-folder-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
 }
 
 .sidebar-footer {
@@ -315,6 +597,165 @@ onMounted(() => {
 .settings-btn-group {
   display: flex;
   gap: 15px;
+}
+
+/* 模态框样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 0;
+  width: 450px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.modal-content.small {
+  width: 400px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-button:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.form-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.color-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.color-option {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.color-option:hover {
+  transform: scale(1.1);
+}
+
+.color-option.active {
+  border-color: var(--text-primary);
+  transform: scale(1.1);
+}
+
+.modal-footer {
+  padding: 20px 24px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btn-primary,
+.btn-secondary {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background: var(--primary-color);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background: var(--hover-bg);
+  border-color: var(--text-secondary);
 }
 
 @keyframes spin {

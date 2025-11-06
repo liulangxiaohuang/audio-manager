@@ -29,7 +29,7 @@
               :key="tag" 
               class="tag"
             >
-              {{ tag }}
+              {{ tag.tag }}
             </span>
           </div>
         </div>

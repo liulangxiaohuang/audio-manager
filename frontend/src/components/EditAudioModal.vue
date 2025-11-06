@@ -23,12 +23,16 @@
           <label class="form-label">标签</label>
           <div class="tags-input">
             <span 
-              v-for="tag in formData.tags" 
-              :key="tag" 
+              v-for="tag in currentTags" 
+              :key="tag._id" 
               class="tag"
             >
-              {{ tag }}
-              <button @click="removeTag(tag)" class="tag-remove">
+              {{ tag.tag }}
+              <button 
+                @click="removeTag(tag._id)" 
+                class="tag-remove"
+                :disabled="tagLoading"
+              >
                 <XIcon :size="12" />
               </button>
             </span>
@@ -39,36 +43,88 @@
               placeholder="回车以添加标签..."
               @keydown.enter="addTag"
               @keydown.backspace="handleBackspace"
+              :disabled="tagLoading"
             />
+          </div>
+          <div v-if="tagLoading" class="loading-text">
+            加载中...
           </div>
         </div>
         
         <div class="form-group">
           <label class="form-label">收藏夹</label>
           <div class="favorite-folders">
+            <!-- 无收藏选项 -->
+            <label class="folder-radio">
+              <input 
+                type="radio" 
+                :value="null"
+                v-model="selectedFolderId"
+              />
+              <span class="radio-mark"></span>
+              <span class="folder-info">
+                <span class="folder-name">无收藏</span>
+              </span>
+            </label>
+            
+            <!-- 收藏夹选项 -->
             <label 
-              v-for="folder in favoriteFolders" 
-              :key="folder.id"
-              class="folder-checkbox"
+              v-for="folder in userFavoriteFolders" 
+              :key="folder._id"
+              class="folder-radio"
             >
               <input 
-                type="checkbox" 
-                :value="folder.id"
-                v-model="formData.favoriteFolders"
+                type="radio" 
+                :value="folder._id"
+                v-model="selectedFolderId"
               />
-              <span class="checkmark"></span>
-              {{ folder.name }}
+              <span class="radio-mark"></span>
+              <span class="folder-info">
+                <span class="folder-name">{{ folder.name }}</span>
+                <span class="folder-color" :style="{ backgroundColor: folder.color }"></span>
+                <span class="folder-count">({{ folder.audioCount }})</span>
+              </span>
             </label>
           </div>
+          
+          <!-- 创建新收藏夹 -->
+          <div class="create-folder-section" v-if="showCreateFolder">
+            <input 
+              v-model="newFolderName" 
+              type="text" 
+              placeholder="新收藏夹名称"
+              class="folder-input"
+              @keyup.enter="createFolder"
+              @keyup.esc="cancelCreateFolder"
+              ref="folderInput"
+            />
+            <div class="create-actions">
+              <button class="action-button confirm" @click="createFolder">
+                <CheckIcon :size="12" />
+              </button>
+              <button class="action-button cancel" @click="cancelCreateFolder">
+                <XIcon :size="12" />
+              </button>
+            </div>
+          </div>
+          
+          <button 
+            class="add-folder-btn" 
+            @click="startCreateFolder" 
+            v-if="!showCreateFolder"
+          >
+            <PlusIcon :size="14" />
+            新建收藏夹
+          </button>
         </div>
       </div>
       
       <div class="modal-footer">
-        <button class="btn-secondary" @click="$emit('close')">
+        <button class="btn-secondary" @click="$emit('close')" :disabled="loading">
           取消
         </button>
-        <button class="btn-primary" @click="saveChanges">
-          保存
+        <button class="btn-primary" @click="saveChanges" :disabled="loading">
+          {{ loading ? '保存中...' : '保存' }}
         </button>
       </div>
     </div>
@@ -76,9 +132,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue'
-import { XIcon } from 'lucide-vue-next'
+import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+import { XIcon, PlusIcon, CheckIcon } from 'lucide-vue-next'
 import type { AudioFile } from '@/types/audio'
+import { useAudioStore } from '@/store/audio'
 
 interface Props {
   audio: AudioFile
@@ -92,52 +149,176 @@ interface Emits {
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
+const audioStore = useAudioStore()
 const newTag = ref('')
+const loading = ref(false)
+const tagLoading = ref(false)
+const selectedFolderId = ref<string | null>(null)
+const showCreateFolder = ref(false)
+const newFolderName = ref('')
+const folderInput = ref<HTMLInputElement | null>(null)
+
+// 使用计算属性获取用户收藏夹和标签
+const userFavoriteFolders = computed(() => audioStore.getUserFavoriteFolders)
+const currentTags = computed(() => audioStore.getAudioTags(props.audio._id))
+
 const formData = reactive({
-  name: props.audio.name,
-  tags: [...props.audio.tags],
-  favoriteFolders: [...props.audio.favoriteFolders]
+  name: props.audio.name
 })
 
-const favoriteFolders = [
-  { id: 'default', name: '默认收藏夹' },
-  { id: 'work', name: '工作音频' },
-  { id: 'music', name: '音乐' },
-  { id: 'recordings', name: '录音' }
-]
+// 初始化时加载标签和收藏夹数据
+onMounted(async () => {
+  try {
+    tagLoading.value = true
+    // 加载用户收藏夹
+    await audioStore.fetchUserFavoriteFolders()
+    // 加载当前音频的标签
+    await audioStore.fetchAudioTags(props.audio._id)
+    
+    // 初始化收藏夹选中状态
+    initializeFolderSelection()
+  } catch (error) {
+    console.error('初始化数据失败:', error)
+  } finally {
+    tagLoading.value = false
+  }
+})
 
-const addTag = () => {
-  const tag = newTag.value.trim()
-  if (tag && !formData.tags.includes(tag)) {
-    formData.tags.push(tag)
-    newTag.value = ''
+// 初始化收藏夹选择
+const initializeFolderSelection = () => {
+  if (props.audio.favorite && props.audio.favorite.isFavorite && props.audio.favorite.folder) {
+    selectedFolderId.value = props.audio.favorite.folder._id
+  } else {
+    selectedFolderId.value = null
   }
 }
 
-const removeTag = (tag: string) => {
-  formData.tags = formData.tags.filter(t => t !== tag)
+// 开始创建收藏夹
+const startCreateFolder = () => {
+  showCreateFolder.value = true
+  newFolderName.value = ''
+  nextTick(() => {
+    if (folderInput.value) {
+      folderInput.value.focus()
+    }
+  })
+}
+
+// 取消创建收藏夹
+const cancelCreateFolder = () => {
+  showCreateFolder.value = false
+  newFolderName.value = ''
+}
+
+// 创建收藏夹
+const createFolder = async () => {
+  if (!newFolderName.value.trim()) return
+  
+  try {
+    const newFolder = await audioStore.createFavoriteFolder({
+      name: newFolderName.value.trim(),
+      description: '',
+      color: getRandomColor()
+    })
+    
+    // 创建成功后自动选中新创建的收藏夹
+    selectedFolderId.value = newFolder._id
+    showCreateFolder.value = false
+    newFolderName.value = ''
+  } catch (error) {
+    console.error('创建收藏夹失败:', error)
+  }
+}
+
+// 生成随机颜色
+const getRandomColor = () => {
+  const colors = [
+    '#007bff', '#28a745', '#dc3545', '#ffc107', '#6f42c1',
+    '#e83e8c', '#fd7e14', '#20c997', '#17a2b8', '#6c757d'
+  ]
+  return colors[Math.floor(Math.random() * colors.length)]
+}
+
+const addTag = async () => {
+  const tag = newTag.value.trim()
+  if (tag && !tagLoading.value) {
+    try {
+      tagLoading.value = true
+      await audioStore.addAudioTag(props.audio._id, tag)
+      newTag.value = ''
+    } catch (error) {
+      console.error('添加标签失败:', error)
+    } finally {
+      tagLoading.value = false
+    }
+  }
+}
+
+const removeTag = async (tagId: string) => {
+  if (!tagLoading.value) {
+    try {
+      tagLoading.value = true
+      await audioStore.removeAudioTag(props.audio._id, tagId)
+    } catch (error) {
+      console.error('移除标签失败:', error)
+    } finally {
+      tagLoading.value = false
+    }
+  }
 }
 
 const handleBackspace = () => {
-  if (!newTag.value && formData.tags.length > 0) {
-    formData.tags.pop()
+  if (!newTag.value && currentTags.value.length > 0) {
+    // 这里可以添加移除最后一个标签的逻辑，但通常用户期望的是删除输入框内容
+    // 如果需要实现按退格键删除最后一个标签，可以取消注释下面的代码
+    // const lastTag = currentTags.value[currentTags.value.length - 1]
+    // removeTag(lastTag._id)
   }
 }
 
-const saveChanges = () => {
-  const updates: Partial<AudioFile> = {
-    name: formData.name,
-    tags: formData.tags,
-    favoriteFolders: formData.favoriteFolders
+const saveChanges = async () => {
+  if (loading.value) return
+  
+  try {
+    loading.value = true
+    
+    // 保存基本信息
+    const updates: Partial<AudioFile> = {
+      name: formData.name
+    }
+    await audioStore.updateAudio(props.audio._id, updates)
+    
+    // 处理收藏夹变更
+    const currentFavoriteFolderId = props.audio.favorite && props.audio.favorite.isFavorite 
+      ? props.audio.favorite.folder?._id 
+      : null
+    
+    // 如果收藏状态发生变化
+    if (currentFavoriteFolderId !== selectedFolderId.value) {
+      if (selectedFolderId.value) {
+        // 添加到收藏夹
+        await audioStore.toggleFavorite(props.audio._id, selectedFolderId.value)
+      } else if (currentFavoriteFolderId) {
+        // 从收藏夹移除（通过再次调用toggleFavorite来取消收藏）
+        await audioStore.toggleFavorite(props.audio._id, currentFavoriteFolderId)
+      }
+    }
+    
+    emit('save', updates)
+  } catch (error) {
+    console.error('保存失败:', error)
+  } finally {
+    loading.value = false
   }
-  emit('save', updates)
 }
 
 // 当音频数据变化时更新表单
 watch(() => props.audio, (newAudio) => {
   formData.name = newAudio.name
-  formData.tags = [...newAudio.tags]
-  formData.favoriteFolders = [...newAudio.favoriteFolders]
+  initializeFolderSelection()
+  
+  // 重新加载标签
+  audioStore.fetchAudioTags(newAudio._id)
 }, { deep: true })
 </script>
 
@@ -267,8 +448,13 @@ watch(() => props.audio, (newAudio) => {
   justify-content: center;
 }
 
-.tag-remove:hover {
+.tag-remove:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.2);
+}
+
+.tag-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .tag-input {
@@ -281,49 +467,170 @@ watch(() => props.audio, (newAudio) => {
   min-width: 100px;
 }
 
+.tag-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.loading-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
 .favorite-folders {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin-bottom: 12px;
 }
 
-.folder-checkbox {
+.folder-radio {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   cursor: pointer;
   font-size: 14px;
   color: var(--text-primary);
+  padding: 8px;
+  border-radius: 6px;
+  transition: background-color 0.3s ease;
 }
 
-.folder-checkbox input {
+.folder-radio:hover {
+  background: var(--hover-bg);
+}
+
+.folder-radio input {
   display: none;
 }
 
-.checkmark {
-  width: 16px;
-  height: 16px;
+.radio-mark {
+  width: 18px;
+  height: 18px;
   border: 2px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: 50%;
   position: relative;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.folder-radio input:checked + .radio-mark {
+  border-color: var(--primary-color);
+  background: var(--primary-color);
+}
+
+.folder-radio input:checked + .radio-mark::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  background: white;
+  border-radius: 50%;
+}
+
+.folder-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.folder-name {
+  flex: 1;
+}
+
+.folder-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.folder-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* 创建收藏夹区域 */
+.create-folder-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+
+.folder-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+}
+
+.folder-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.create-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.action-button {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text-secondary);
   transition: all 0.3s ease;
 }
 
-.folder-checkbox input:checked + .checkmark {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
+.action-button:hover {
+  background: var(--border-color);
+  color: var(--text-primary);
 }
 
-.folder-checkbox input:checked + .checkmark::after {
-  content: '';
-  position: absolute;
-  left: 4px;
-  top: 1px;
-  width: 4px;
-  height: 8px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+.action-button.confirm {
+  color: #28a745;
+}
+
+.action-button.cancel {
+  color: #dc3545;
+}
+
+.add-folder-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  font-size: 13px;
+  justify-content: center;
+}
+
+.add-folder-btn:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
 }
 
 .modal-footer {
@@ -343,10 +650,16 @@ watch(() => props.audio, (newAudio) => {
   cursor: pointer;
   font-size: 14px;
   transition: all 0.3s ease;
+  min-width: 80px;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   opacity: 0.9;
+}
+
+.btn-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .btn-secondary {
@@ -358,10 +671,16 @@ watch(() => props.audio, (newAudio) => {
   cursor: pointer;
   font-size: 14px;
   transition: all 0.3s ease;
+  min-width: 80px;
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover:not(:disabled) {
   background: var(--hover-bg);
   border-color: var(--text-secondary);
+}
+
+.btn-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 </style>

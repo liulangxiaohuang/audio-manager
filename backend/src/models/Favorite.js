@@ -12,8 +12,9 @@ const favoriteSchema = new mongoose.Schema({
     required: true
   },
   folder: {
-    type: String,
-    default: 'default'
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'UserFavoriteFolder',
+    required: true
   },
   createdAt: {
     type: Date,
@@ -23,10 +24,11 @@ const favoriteSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// 创建复合索引，确保用户对同一个音频只能收藏一次
-favoriteSchema.index({ user: 1, audio: 1 }, { unique: true });
+// 创建复合索引，确保用户对同一个音频在同一个收藏夹只能收藏一次
+favoriteSchema.index({ user: 1, audio: 1, folder: 1 }, { unique: true });
 
-// 为音频ID创建索引以便快速查询
+// 为音频ID和收藏夹ID创建索引以便快速查询
 favoriteSchema.index({ audio: 1 });
+favoriteSchema.index({ folder: 1 });
 
 export default mongoose.model('Favorite', favoriteSchema);

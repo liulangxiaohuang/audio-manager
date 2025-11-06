@@ -62,6 +62,46 @@ export const audioApi = {
   getFavorites: (params?: any) => api.get('/audio/favorites', { params }),
 }
 
+export const favoriteFolderApi = {
+  // 获取我的收藏夹
+  getMyFolders: () => 
+    api.get('/favorite-folders', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }),
+  
+  // 创建收藏夹
+  createFolder: (data: { name: string; description?: string; color?: string }) => 
+    api.post('/favorite-folders', data, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }),
+  
+  // 获取收藏夹下的音频
+  getFolderAudios: (folderId: string) => 
+    api.get(`/favorite-folders/${folderId}/audios`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+};
+
+export const tagApi = {
+  // 获取音频标签
+  getAudioTags: (audioId: string) => 
+    api.get(`/tags/audio/${audioId}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }),
+  
+  // 添加标签到音频
+  addTag: (audioId: string, tag: string) => 
+    api.post(`/tags/audio/${audioId}`, { tag }, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }),
+  
+  // 移除音频标签
+  removeTag: (audioId: string, tagId: string) => 
+    api.delete(`/tags/audio/${audioId}/tag/${tagId}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+};
+
 export const authApi = {
   // 登录
   login: (credentials: { username: string; password: string }) => 
