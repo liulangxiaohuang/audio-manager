@@ -36,13 +36,10 @@ const audioSchema = new mongoose.Schema({
   tags: [{
     type: String
   }],
-  isFavorite: {
-    type: Boolean,
-    default: false
+  downloadCount: {
+    type: Number,
+    default: 0
   },
-  favoriteFolders: [{
-    type: String
-  }],
   isDeleted: {
     type: Boolean,
     default: false
@@ -54,6 +51,6 @@ const audioSchema = new mongoose.Schema({
 // 创建索引以便快速搜索
 audioSchema.index({ name: 'text', tags: 'text' });
 audioSchema.index({ folder: 1 });
-audioSchema.index({ isFavorite: 1 });
+audioSchema.index({ downloadCount: -1 }); // 为下载次数创建索引
 
 export default mongoose.model('Audio', audioSchema);

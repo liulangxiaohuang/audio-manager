@@ -71,6 +71,60 @@
       </div>
     </div>
 
+    <div class="most-favorited">
+      <div class="section-header">
+        <h3>收藏最多的音频</h3>
+        <div class="section-actions">
+          <HeartIcon :size="20" />
+          <RefreshCwIcon :size="16" class="refresh-btn" @click="refreshMostFavorited" />
+        </div>
+      </div>
+      <div class="audio-list">
+        <div v-for="(audio, index) in audioStore.dashboardMostFavoritedAudios" :key="audio._id" class="audio-item">
+          <div class="audio-rank">{{ index + 1 }}</div>
+          <div class="audio-info">
+            <div class="audio-name">{{ audio.name }}</div>
+            <div class="audio-meta">
+              <span class="format">{{ audio.format.toUpperCase() }}</span>
+              <span class="duration">{{ formatAudioDuration(audio.duration) }}</span>
+              <span class="folder">{{ audio.folder }}</span>
+            </div>
+          </div>
+          <div class="favorite-count">
+            <HeartIcon :size="16" />
+            <span>{{ audio.favoriteCount }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="most-downloaded">
+      <div class="section-header">
+        <h3>下载最多的音频</h3>
+        <div class="section-actions">
+          <DownloadIcon :size="20" />
+          <RefreshCwIcon :size="16" class="refresh-btn" @click="refreshMostDownloaded" />
+        </div>
+      </div>
+      <div class="audio-list">
+        <div v-for="(audio, index) in audioStore.dashboardMostDownloadedAudios" :key="audio._id" class="audio-item">
+          <div class="audio-rank">{{ index + 1 }}</div>
+          <div class="audio-info">
+            <div class="audio-name">{{ audio.name }}</div>
+            <div class="audio-meta">
+              <span class="format">{{ audio.format.toUpperCase() }}</span>
+              <span class="duration">{{ formatAudioDuration(audio.duration) }}</span>
+              <span class="folder">{{ audio.folder }}</span>
+            </div>
+          </div>
+          <div class="download-count">
+            <DownloadIcon :size="16" />
+            <span>{{ audio.downloadCount }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 最近上传的音频 -->
     <div class="recent-audios">
       <div class="section-header">
@@ -104,11 +158,9 @@
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import { 
-  UsersIcon, 
   ListMusicIcon, 
-  FolderIcon, 
   HeartIcon,
-  ClockIcon,
+  DownloadIcon,
   PieChartIcon,
   BarChart3Icon,
   TrendingUpIcon,
@@ -133,6 +185,9 @@ let tagChart: echarts.ECharts | null = null
 
 // 标签图表类型状态
 const tagChartType = ref('bar') // 默认使用柱状图
+
+// 词云扩展
+let wordcloudExtension: any = null
 
 // 格式化函数
 const formatDuration = (seconds: number): string => {
@@ -159,6 +214,38 @@ const formatAudioDuration = (seconds: number): string => {
 
 const formatTime = (timestamp: string): string => {
   return new Date(timestamp).toLocaleDateString('zh-CN')
+}
+
+// 生成随机颜色函数
+const generateRandomColors = (count: number, type: 'solid' | 'gradient' = 'gradient') => {
+  const colors = []
+  
+  for (let i = 0; i < count; i++) {
+    // 生成鲜艳且对比度好的颜色
+    const hue = Math.floor(Math.random() * 360) // 0-359 色相
+    const saturation = 70 + Math.floor(Math.random() * 30) // 70-100% 饱和度
+    const lightness = 40 + Math.floor(Math.random() * 30) // 40-70% 亮度
+    
+    const baseColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`
+    
+    if (type === 'solid') {
+      colors.push(baseColor)
+    } else {
+      // 生成渐变颜色
+      const lightHue = (hue + 20) % 360
+      const darkHue = (hue - 20 + 360) % 360
+      
+      const gradient = new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+        { offset: 0, color: `hsl(${lightHue}, ${saturation}%, ${lightness + 10}%)` },
+        { offset: 0.5, color: baseColor },
+        { offset: 1, color: `hsl(${darkHue}, ${saturation}%, ${lightness - 10}%)` }
+      ])
+      
+      colors.push(gradient)
+    }
+  }
+  
+  return colors
 }
 
 // 安全销毁图表函数
@@ -289,30 +376,48 @@ const initDurationChart = () => {
   try {
     durationChart = echarts.init(durationChartContainer.value)
     
+    const durationData = audioStore.dashboardDurationDistribution.map((item: any) => item.count)
+    const durationLabels = audioStore.dashboardDurationDistribution.map((item: any) => item.range)
+    
+    // 为每个柱子生成随机颜色
+    const barColors = generateRandomColors(durationData.length, 'gradient')
+    
     const option = {
       tooltip: {
         trigger: 'axis',
         axisPointer: {
           type: 'shadow'
+        },
+        formatter: function (params: any) {
+          const data = params[0]
+          return `${data.name}<br/>数量: ${data.value}`
         }
       },
       xAxis: {
         type: 'category',
-        data: audioStore.dashboardDurationDistribution.map((item: any) => item.range)
+        data: durationLabels,
+        axisLabel: {
+          rotate: 30,
+          fontSize: 10
+        }
       },
       yAxis: {
         type: 'value'
       },
       series: [
         {
-          data: audioStore.dashboardDurationDistribution.map((item: any) => item.count),
+          name: '音频数量',
+          data: durationData.map((count: number, index: number) => ({
+            value: count,
+            itemStyle: {
+              color: barColors[index]
+            }
+          })),
           type: 'bar',
-          itemStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'red' },
-              { offset: 0.5, color: '#188df0' },
-              { offset: 1, color: '#188df0' }
-            ])
+          label: {
+            show: true,
+            position: 'top',
+            fontSize: 10
           }
         }
       ]
@@ -377,7 +482,7 @@ const initTagChart = () => {
       .sort((a, b) => b.value - a.value)
       .slice(0, 15)
     
-    if (tagChartType.value === 'wordcloud') {
+    if (tagChartType.value === 'wordcloud' && wordcloudExtension) {
       // 词云图选项
       const option = {
         tooltip: {
@@ -431,7 +536,9 @@ const initTagChart = () => {
       }
       tagChart.setOption(option)
     } else {
-      // 柱状图选项
+      // 柱状图选项 - 使用随机颜色
+      const barColors = generateRandomColors(tagData.length, 'gradient')
+      
       const option = {
         tooltip: {
           trigger: 'axis',
@@ -470,13 +577,12 @@ const initTagChart = () => {
           {
             name: '标签数量',
             type: 'bar',
-            data: tagData.map(item => item.value),
-            itemStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-                { offset: 0, color: '#5470c6' },
-                { offset: 1, color: '#91cc75' }
-              ])
-            },
+            data: tagData.map((item, index) => ({
+              value: item.value,
+              itemStyle: {
+                color: barColors[index]
+              }
+            })),
             label: {
               show: true,
               position: 'right',
@@ -490,6 +596,22 @@ const initTagChart = () => {
     }
   } catch (error) {
     console.error('初始化标签图表失败:', error)
+  }
+}
+
+const refreshMostFavorited = async () => {
+  try {
+    await audioStore.fetchMostFavoritedAudios(5)
+  } catch (error) {
+    console.error('刷新收藏最多音频失败:', error)
+  }
+}
+
+const refreshMostDownloaded = async () => {
+  try {
+    await audioStore.fetchMostDownloadedAudios(5)
+  } catch (error) {
+    console.error('刷新下载最多音频失败:', error)
   }
 }
 
@@ -687,6 +809,52 @@ onUnmounted(() => {
   width: 100%;
 }
 
+.most-favorited {
+  background: var(--card-bg);
+  border-radius: 4px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+}
+
+.audio-rank {
+  width: 24px;
+  height: 24px;
+  background: var(--primary-color);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  margin-right: 12px;
+}
+
+.favorite-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #ff6b6b;
+  font-weight: bold;
+}
+
+.most-downloaded {
+  background: var(--card-bg);
+  border-radius: 4px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 24px;
+}
+
+.download-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #4CAF50;
+  font-weight: bold;
+}
+
 .recent-audios {
   background: var(--card-bg);
   border-radius: 4px;
@@ -752,7 +920,8 @@ onUnmounted(() => {
 }
 
 .audio-meta span {
-  padding: 2px 8px;
+  /* padding: 2px 0px; */
+  padding-top: 2px;
   /*background: var(--bg-primary);*/
   border-radius: 4px;
 }

@@ -11,18 +11,19 @@ import {
   getFolderContents,
   cleanupDeletedAudio
 } from '../controllers/audioController.js';
+import { authMiddleware, adminMiddleware } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-router.post('/sync', syncAudio);
-router.get('/list', getAudioList);
-router.get('/folders', getFolderStructure);
-router.get('/file/:path', streamAudio);
-router.put('/:id', updateAudio);
-router.post('/:id/favorite', toggleFavorite);
-router.delete('/:id', deleteAudio);
-router.get('/favorites', getFavorites);
-router.get('/contents', getFolderContents);
-router.delete('/cleanup', cleanupDeletedAudio); // 添加清理路由
+router.post('/sync', adminMiddleware, syncAudio);
+router.get('/list', authMiddleware, getAudioList);
+router.get('/folders', authMiddleware, getFolderStructure);
+router.get('/file/:path', authMiddleware, streamAudio);
+router.put('/:id', adminMiddleware, updateAudio);
+router.post('/:id/favorite', authMiddleware, toggleFavorite);
+router.delete('/:id', adminMiddleware, deleteAudio);
+router.get('/favorites', authMiddleware, getFavorites);
+router.get('/contents', authMiddleware, getFolderContents);
+router.delete('/cleanup', adminMiddleware, cleanupDeletedAudio); // 添加清理路由
 
 export default router;

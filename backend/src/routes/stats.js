@@ -11,5 +11,7 @@ router.get('/duration-distribution', adminMiddleware, statsController.getDuratio
 router.get('/user-registration-trend', adminMiddleware, statsController.getUserRegistrationTrend);
 router.get('/tag-stats', adminMiddleware, statsController.getTagStats);
 router.get('/recent-audios', adminMiddleware, statsController.getRecentAudios);
+router.get('/most-favorited', adminMiddleware, statsController.getMostFavoritedAudios); // 新增
+router.get('/most-downloaded', adminMiddleware, statsController.getMostDownloadedAudios); // 新增
 
 export default router;

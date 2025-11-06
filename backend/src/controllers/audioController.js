@@ -1,5 +1,7 @@
 import AudioService from '../services/AudioService.js';
 import Audio from '../models/Audio.js';
+import Favorite from '../models/Favorite.js'; // 新增
+import Download from '../models/Download.js'; // 新增
 import fs from 'fs';
 import path from 'path';
 
@@ -54,9 +56,42 @@ export const streamAudio = async (req, res) => {
   try {
     const relativePath = decodeURIComponent(req.params.path);
     const fullPath = path.join(AudioService.basePath, relativePath);
+    console.log(10, relativePath)
+    console.log(11, fullPath)
 
     if (!fs.existsSync(fullPath)) {
       return res.status(404).json({ message: 'Audio file not found' });
+    }
+
+    // 记录下载（如果用户已登录）
+    if (req.user && req.user.userId) {
+      console.log(22, req.user)
+      try {
+        // 此处可以优化：
+        // path可以取配置中的basePath + relativePath
+        // 因为fullPath固化了系统的文件夹，加入系统目录变更，将会导致数据不可用
+        const audio = await Audio.findOne({ path: fullPath });
+        console.log(33, audio)
+        if (audio) {
+          // 增加下载计数
+          audio.downloadCount += 1;
+          await audio.save();
+          
+          // 记录下载详情
+          const download = new Download({
+            user: req.user.userId,
+            audio: audio._id,
+            ip: req.ip,
+            userAgent: req.get('User-Agent')
+          });
+          await download.save();
+          
+          console.log(`Download recorded for audio: ${audio.name} by user: ${req.user.userId}`);
+        }
+      } catch (downloadError) {
+        console.error('Error recording download:', downloadError);
+        // 不阻断音频流，只记录错误
+      }
     }
 
     const stat = fs.statSync(fullPath);
@@ -123,35 +158,47 @@ export const toggleFavorite = async (req, res) => {
   try {
     const { id } = req.params;
     const { favoriteFolder = 'default' } = req.body;
+    const userId = req.user.userId; // 从认证中间件中获取用户ID
 
+    // 检查音频是否存在
     const audio = await Audio.findById(id);
     if (!audio) {
       return res.status(404).json({ message: 'Audio not found' });
     }
+    console.log(11, userId, audio)
 
-    // 检查是否已经在收藏夹中
-    const isInFolder = audio.favoriteFolders.includes(favoriteFolder);
-    
-    if (isInFolder) {
-      // 从收藏夹移除
-      audio.favoriteFolders = audio.favoriteFolders.filter(f => f !== favoriteFolder);
-      audio.isFavorite = false
-    } else {
-      // 添加到收藏夹
-      audio.favoriteFolders.push(favoriteFolder);
-      audio.isFavorite = true
-    }
-
-    console.log(audio)
-
-    await audio.save();
-    
-    console.log(`Audio " ${audio.name} " ${isInFolder ? 'removed from' : 'added to'} favorite folder: ${favoriteFolder}`);
-    
-    res.json({
-      ...audio.toObject(),
-      isFavorite: audio.favoriteFolders.length > 0
+    // 检查是否已经收藏
+    const existingFavorite = await Favorite.findOne({
+      user: userId,
+      audio: id
     });
+    console.log(22, existingFavorite)
+
+    if (existingFavorite) {
+      // 取消收藏
+      await Favorite.findByIdAndDelete(existingFavorite._id);
+      console.log(`User ${userId} removed audio "${audio.name}" from favorites`);
+      
+      res.json({
+        isFavorite: false,
+        favoriteFolders: []
+      });
+    } else {
+      // 添加收藏
+      const favorite = new Favorite({
+        user: userId,
+        audio: id,
+        folder: favoriteFolder
+      });
+      await favorite.save();
+      
+      console.log(`User ${userId} added audio "${audio.name}" to favorites in folder: ${favoriteFolder}`);
+      
+      res.json({
+        isFavorite: true,
+        favoriteFolders: [favoriteFolder]
+      });
+    }
   } catch (error) {
     console.error('Error toggling favorite:', error);
     res.status(500).json({ message: error.message });
@@ -183,17 +230,52 @@ export const deleteAudio = async (req, res) => {
 export const getFavorites = async (req, res) => {
   try {
     const { folder } = req.query;
-    const filter = { 
-      isDeleted: false, // 只返回未删除的收藏
-      favoriteFolders: { $exists: true, $ne: [] }
-    };
+    const userId = req.user.userId;
 
+    let favoriteFilter = { user: userId };
+    
     if (folder && folder !== 'all') {
-      filter.favoriteFolders = folder;
+      favoriteFilter.folder = folder;
     }
 
-    const audios = await Audio.find(filter).sort({ name: 1 });
+    // 获取用户的收藏记录，并关联音频信息
+    const favorites = await Favorite.find(favoriteFilter)
+      .populate('audio')
+      .sort({ createdAt: -1 });
+
+    // 过滤掉已删除的音频
+    const validFavorites = favorites.filter(fav => 
+      fav.audio && !fav.audio.isDeleted
+    );
+
+    // 转换为音频列表格式
+    const audios = validFavorites.map(fav => ({
+      ...fav.audio.toObject(),
+      isFavorite: true,
+      favoriteFolders: [fav.folder]
+    }));
+
     res.json(audios);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// 新增：检查用户是否收藏了某个音频
+export const checkFavorite = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.userId;
+
+    const favorite = await Favorite.findOne({
+      user: userId,
+      audio: id
+    });
+
+    res.json({
+      isFavorite: !!favorite,
+      favoriteFolders: favorite ? [favorite.folder] : []
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

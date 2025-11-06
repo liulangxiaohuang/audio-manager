@@ -124,6 +124,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { StarIcon, Edit3Icon, Trash2Icon, ArrowDownFromLineIcon } from 'lucide-vue-next'
+import axios from 'axios'
 import CanvasWaveform from './CanvasWaveform.vue'
 import EditAudioModal from './EditAudioModal.vue'
 import FavoriteModal from './FavoriteModal.vue'
@@ -320,13 +321,34 @@ const handleDownload = () => {
 }
 
 const downloadByFrontend = (url: string, filename?: string) => {
-  // 创建一个隐藏的a标签
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename || url.split('/').pop() || 'audio';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  downloadByAxios(url, filename)
+};
+
+const downloadByAxios = async (url: string, filename?: string) => {
+  try {
+    const response = await axios.get(url, {
+      responseType: 'blob',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    });
+
+    // 创建 blob URL
+    const blobUrl = URL.createObjectURL(response.data);
+    
+    // 创建隐藏的 a 标签进行下载
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename || url.split('/').pop() || 'audio';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    // 释放 blob URL 内存
+    URL.revokeObjectURL(blobUrl);
+  } catch (error) {
+    console.error('下载失败:', error);
+  }
 };
 
 // 监听播放状态变化，确保进度正确显示

@@ -9,6 +9,11 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     console.log(`Making ${config.method?.toUpperCase()} request to: ${config.url}`)
+    console.log(111222, config)
+    config.headers = {
+      ...config.headers,
+      Authorization: `Bearer ${localStorage.getItem('token')}`
+    }
     return config
   },
   (error) => {
@@ -131,6 +136,18 @@ export const statsApi = {
   // 最近上传的音频
   getRecentAudios: (limit: number = 10) => 
     api.get(`/stats/recent-audios?limit=${limit}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }),
+
+  // 收藏最多的音频
+  getMostFavoritedAudios: (limit: number = 10) => 
+    api.get(`/stats/most-favorited?limit=${limit}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }),
+  
+  // 下载最多的音频
+  getMostDownloadedAudios: (limit: number = 10) => 
+    api.get(`/stats/most-downloaded?limit=${limit}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     })
 }

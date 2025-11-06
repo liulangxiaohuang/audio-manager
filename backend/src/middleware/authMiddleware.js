@@ -36,9 +36,13 @@ export const authMiddleware = async (req, res, next) => {
     }
 
     req.userId = user._id;
-    req.user = user;
+    req.user = {
+      ...user.toObject(),
+      userId: user._id
+    };
     next();
   } catch (error) {
+    console.log(rror)
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
@@ -62,6 +66,7 @@ export const authMiddleware = async (req, res, next) => {
 export const adminMiddleware = async (req, res, next) => {
   try {
     await authMiddleware(req, res, () => {});
+    console.log(8900, req.user.role)
     
     if (req.user.role !== 'admin') {
       return res.status(403).json({

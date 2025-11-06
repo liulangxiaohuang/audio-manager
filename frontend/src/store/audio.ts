@@ -51,6 +51,8 @@ interface DashboardState {
   userTrend: UserTrend;
   tagStats: TagStat[];
   recentAudios: AudioFile[];
+  mostFavoritedAudios: AudioFile[]; // 新增
+  mostDownloadedAudios: AudioFile[]; // 新增
   dashboardLoading: boolean;
 }
 
@@ -93,6 +95,8 @@ export const useAudioStore = defineStore('audio', () => {
     },
     tagStats: [],
     recentAudios: [],
+    mostFavoritedAudios: [], // 新增
+    mostDownloadedAudios: [], // 新增
     dashboardLoading: false
   })
 
@@ -141,6 +145,8 @@ export const useAudioStore = defineStore('audio', () => {
   const dashboardUserTrend = computed(() => dashboardState.value.userTrend)
   const dashboardTagStats = computed(() => dashboardState.value.tagStats)
   const dashboardRecentAudios = computed(() => dashboardState.value.recentAudios)
+  const dashboardMostFavoritedAudios = computed(() => dashboardState.value.mostFavoritedAudios)
+  const dashboardMostDownloadedAudios = computed(() => dashboardState.value.mostDownloadedAudios)
   const dashboardLoading = computed(() => dashboardState.value.dashboardLoading)
 
   // 修复：简化的音频播放器事件监听
@@ -668,6 +674,38 @@ export const useAudioStore = defineStore('audio', () => {
     }
   }
 
+  // 添加获取收藏最多音频的方法
+  const fetchMostFavoritedAudios = async (limit: number = 10): Promise<AudioFile[]> => {
+    try {
+      const result = await statsApi.getMostFavoritedAudios(limit);
+      if (result.data.code === 200) {
+        dashboardState.value.mostFavoritedAudios = result.data.data;
+        return result.data.data;
+      }
+      throw new Error(result.data.message || '获取收藏最多音频失败');
+    } catch (error: any) {
+      console.error('获取收藏最多音频失败:', error);
+      showNotification(error.message, 'error');
+      throw error;
+    }
+  }
+
+  // 添加获取下载最多音频的方法
+  const fetchMostDownloadedAudios = async (limit: number = 10): Promise<AudioFile[]> => {
+    try {
+      const result = await statsApi.getMostDownloadedAudios(limit);
+      if (result.data.code === 200) {
+        dashboardState.value.mostDownloadedAudios = result.data.data;
+        return result.data.data;
+      }
+      throw new Error(result.data.message || '获取下载最多音频失败');
+    } catch (error: any) {
+      console.error('获取下载最多音频失败:', error);
+      showNotification(error.message, 'error');
+      throw error;
+    }
+  }
+
   // 新增：获取最近上传的音频
   const fetchRecentAudios = async (limit: number = 10): Promise<AudioFile[]> => {
     try {
@@ -694,7 +732,9 @@ export const useAudioStore = defineStore('audio', () => {
         fetchDurationDistribution(),
         fetchUserTrend(),
         fetchTagStats(),
-        fetchRecentAudios(8)
+        fetchRecentAudios(8),
+        fetchMostFavoritedAudios(5), // 新增：获取前5个收藏最多的音频
+        fetchMostDownloadedAudios(5) // 新增
       ]);
     } catch (error) {
       console.error('获取仪表盘数据失败:', error);
@@ -826,6 +866,8 @@ export const useAudioStore = defineStore('audio', () => {
     dashboardUserTrend,
     dashboardTagStats,
     dashboardRecentAudios,
+    dashboardMostFavoritedAudios,
+    dashboardMostDownloadedAudios,
     dashboardLoading,
     
     // Actions
@@ -869,6 +911,8 @@ export const useAudioStore = defineStore('audio', () => {
     fetchUserTrend,
     fetchTagStats,
     fetchRecentAudios,
+    fetchMostFavoritedAudios,
+    fetchMostDownloadedAudios,
     fetchDashboardData,
     refreshDashboard,
 

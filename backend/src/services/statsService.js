@@ -1,5 +1,6 @@
 import User from '../models/User.js';
 import Audio from '../models/Audio.js';
+import Favorite from '../models/Favorite.js'; // 新增
 
 class StatsService {
   // 获取统计信息
@@ -26,11 +27,8 @@ class StatsService {
           { $count: 'count' }
         ]),
         
-        // 收藏总数
-        Audio.countDocuments({ 
-          isFavorite: true, 
-          isDeleted: false 
-        }),
+        // 收藏总数 - 修改：从 Favorite 表统计
+        Favorite.countDocuments(),
 
         Audio.aggregate([
           { $match: { isDeleted: false } },
@@ -184,6 +182,96 @@ class StatsService {
       return recentAudios;
     } catch (error) {
       throw new Error(`获取最近音频失败: ${error.message}`);
+    }
+  }
+
+  // 获取收藏最多的音频
+  async getMostFavoritedAudios(limit = 10) {
+    try {
+      const mostFavorited = await Favorite.aggregate([
+        {
+          $group: {
+            _id: '$audio',
+            favoriteCount: { $sum: 1 }
+          }
+        },
+        {
+          $lookup: {
+            from: 'audios',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'audioInfo'
+          }
+        },
+        {
+          $unwind: '$audioInfo'
+        },
+        {
+          $match: {
+            'audioInfo.isDeleted': false
+          }
+        },
+        {
+          $project: {
+            _id: '$audioInfo._id',
+            name: '$audioInfo.name',
+            format: '$audioInfo.format',
+            duration: '$audioInfo.duration',
+            folder: '$audioInfo.folder',
+            url: '$audioInfo.url',
+            favoriteCount: 1
+          }
+        },
+        {
+          $sort: { favoriteCount: -1 }
+        },
+        {
+          $limit: limit
+        }
+      ]);
+
+      return mostFavorited;
+    } catch (error) {
+      throw new Error(`获取收藏最多音频失败: ${error.message}`);
+    }
+  }
+
+  // 获取下载最多的音频
+  async getMostDownloadedAudios(limit = 10) {
+    try {
+      const mostDownloaded = await Audio.find({ 
+        isDeleted: false,
+        downloadCount: { $gt: 0 }
+      })
+      .sort({ downloadCount: -1 })
+      .limit(limit)
+      .select('name format duration folder downloadCount url')
+      .lean();
+
+      return mostDownloaded;
+    } catch (error) {
+      throw new Error(`获取下载最多音频失败: ${error.message}`);
+    }
+  }
+
+  // 获取用户的收藏统计
+  async getUserFavoriteStats(userId) {
+    try {
+      const favoriteStats = await Favorite.aggregate([
+        {
+          $match: { user: mongoose.Types.ObjectId(userId) }
+        },
+        {
+          $group: {
+            _id: '$folder',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+
+      return favoriteStats;
+    } catch (error) {
+      throw new Error(`获取用户收藏统计失败: ${error.message}`);
     }
   }
 }

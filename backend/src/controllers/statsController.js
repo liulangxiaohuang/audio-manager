@@ -106,6 +106,43 @@ class StatsController {
       });
     }
   }
+
+  async getMostFavoritedAudios(req, res) {
+    try {
+      const { limit = 10 } = req.query;
+      const mostFavorited = await statsService.getMostFavoritedAudios(parseInt(limit));
+      res.json({
+        code: 200,
+        message: '获取收藏最多音频成功',
+        data: mostFavorited
+      });
+    } catch (error) {
+      console.error('获取收藏最多音频错误:', error);
+      res.status(500).json({
+        code: 500,
+        message: error.message
+      });
+    }
+  }
+
+  // 获取下载最多的音频
+  async getMostDownloadedAudios(req, res) {
+    try {
+      const { limit = 10 } = req.query;
+      const mostDownloaded = await statsService.getMostDownloadedAudios(parseInt(limit));
+      res.json({
+        code: 200,
+        message: '获取下载最多音频成功',
+        data: mostDownloaded
+      });
+    } catch (error) {
+      console.error('获取下载最多音频错误:', error);
+      res.status(500).json({
+        code: 500,
+        message: error.message
+      });
+    }
+  }
 }
 
 export default new StatsController();
