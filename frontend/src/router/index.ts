@@ -30,6 +30,13 @@ const routes: RouteRecordRaw[] = [
         path: '/favorites',
         name: 'Favorites',
         component: () => import('@/views/FavoritesView.vue')
+      },
+      // 新增：特定收藏夹路由
+      {
+        path: '/favorites/:folderId',
+        name: 'FavoriteFolder',
+        component: () => import('@/views/FavoritesView.vue'),
+        props: true // 将路由参数作为props传递给组件
       }
     ]
   },

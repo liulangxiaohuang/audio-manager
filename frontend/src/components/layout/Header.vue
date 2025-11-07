@@ -184,9 +184,11 @@ const navigateTo = (path: string) => {
 // 监听 store 中的搜索查询变化
 watch(() => audioStore.searchQuery, (newQuery) => {
   if (newQuery !== searchQuery.value) {
+    console.log(3333)
     searchQuery.value = newQuery
     // 如果有搜索内容，确保搜索框是展开状态
     if (newQuery && !isSearchExpanded.value) {
+      console.log(4444444)
       isSearchExpanded.value = true
     }
   }

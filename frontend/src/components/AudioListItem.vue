@@ -57,8 +57,8 @@
           <button 
             @click="showFavoriteModal = true"
             class="action-btn favorite-btn"
-            :class="{ 'is-favorite': audio.favoriteFolders.length > 0 }"
-            :title="audio.favoriteFolders.length > 0 ? '取消收藏' : '收藏'"
+            :class="{ 'is-favorite': audio.favorite.isFavorite }"
+            :title="audio.favorite.isFavorite ? '取消收藏' : '收藏'"
           >
             <StarIcon :size="16" />
           </button>
@@ -329,7 +329,8 @@ const downloadByAxios = async (url: string, filename?: string) => {
     const response = await axios.get(url, {
       responseType: 'blob',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`
+        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'User-Action': 'Download'
       }
     });
 
@@ -407,12 +408,14 @@ watch(playProgress, (newProgress) => {
 .audio-list-item:first-child {
   border-top-left-radius: 8px;
   border-top-right-radius: 8px;
+  border-top: none;
 }
 
 .audio-list-item:last-child {
   border-bottom-left-radius: 8px;
   border-bottom-right-radius: 8px;
   margin-bottom: 0;
+  border-bottom: 0;
 }
 
 .audio-list-item:hover {

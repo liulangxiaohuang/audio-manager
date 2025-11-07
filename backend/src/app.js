@@ -1,5 +1,6 @@
 import express from 'express';
 import mongoose from 'mongoose';
+import cookieParser from 'cookie-parser'
 import cors from 'cors';
 import dotenv from 'dotenv';
 import audioRoutes from './routes/audio.js';
@@ -17,6 +18,7 @@ const PORT = process.env.PORT || 3000;
 
 // 中间件
 app.use(cors());
+app.use(cookieParser())
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 

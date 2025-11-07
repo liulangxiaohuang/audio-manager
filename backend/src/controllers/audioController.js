@@ -66,7 +66,7 @@ export const streamAudio = async (req, res) => {
     }
 
     // 记录下载（如果用户已登录）
-    if (req.user && req.user.userId) {
+    if (req.user && req.user.userId && req.headers['user-action'] === 'Download') {
       console.log(22, req.user)
       try {
         // 此处可以优化：
@@ -159,7 +159,7 @@ export const updateAudio = async (req, res) => {
 export const toggleFavorite = async (req, res) => {
   try {
     const { id } = req.params;
-    const { folderId } = req.body; // 改为传递收藏夹ID
+    const { favoriteFolder: folderId } = req.body; // 改为传递收藏夹ID
     const userId = req.user.userId;
 
     // 检查音频是否存在
@@ -280,14 +280,55 @@ export const getFavorites = async (req, res) => {
     const audios = validFavorites.map(fav => ({
       ...fav.audio.toObject(),
       isFavorite: true,
-      favoriteFolder: {
-        id: fav.folder?._id,
-        name: fav.folder?.name,
-        color: fav.folder?.color
+      favorite: {
+        folder: {
+          id: fav.folder?._id,
+          name: fav.folder?.name,
+          color: fav.folder?.color
+        },
+        isFavorite: true
       }
     }));
 
-    res.json(audios);
+    // 对于音频文件，获取当前用户的标签和收藏状态
+    const audioIds = audios.map(item => item._id);
+    
+    // 并行查询用户的标签和收藏状态
+    const [userTags] = await Promise.all([
+      // 获取用户标签
+      UserAudioTag.find({
+        user: userId,
+        audio: { $in: audioIds }
+      })
+    ]);
+    
+    // 将标签按音频ID分组
+    const tagsByAudio = userTags.reduce((acc, tag) => {
+      if (!acc[tag.audio]) {
+        acc[tag.audio] = [];
+      }
+      acc[tag.audio].push({
+        _id: tag._id,
+        tag: tag.tag,
+        createdAt: tag.createdAt
+      });
+      return acc;
+    }, {});
+    
+    // 将用户数据添加到音频对象中
+    const contentsWithUserData = audios.map(item => {
+      if (item.type === 'audio') {
+        const audioId = item._id.toString();
+        return {
+          // ...item.toObject(),
+          ...item,
+          tags: tagsByAudio[audioId] || [],
+        };
+      }
+      return item;
+    });
+
+    res.json(contentsWithUserData)
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -368,6 +409,10 @@ export const getFolderAudios = async (req, res) => {
     const audios = validFavorites.map(fav => ({
       ...fav.audio.toObject(),
       isFavorite: true,
+      favorite: {
+        folder,
+        isFavorite: true
+      },
       favoritedAt: fav.createdAt
     }));
     

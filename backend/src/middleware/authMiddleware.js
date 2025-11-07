@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 
 export const authMiddleware = async (req, res, next) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const token = req.header('Authorization')?.replace('Bearer ', '') || req.cookies.token;
     
     if (!token) {
       return res.status(401).json({
@@ -42,7 +42,7 @@ export const authMiddleware = async (req, res, next) => {
     };
     next();
   } catch (error) {
-    console.log(rror)
+    console.log(error)
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,

@@ -94,6 +94,14 @@ export const login = async (req, res) => {
     const token = user.generateAuthToken();
     await user.save();
 
+    // 写 cookie （非常关键）
+    res.cookie('token', token, {
+      httpOnly: true,          // js 无法 get，防 xss
+      secure: true,            // https 环境自动启用；如果你是 http 开发，暂时改 false
+      sameSite: 'lax',         // 如果前端和 API 同站点，一般用 lax 最合适
+      path: '/api/'       // 只对 /api/audio 下的请求生效
+    })
+
     res.json({
       success: true,
       message: '登录成功',
@@ -205,6 +213,8 @@ export const logout = async (req, res) => {
       user.tokenExpires = null;
       await user.save();
     }
+
+    res.clearCookie('token', { path: '/api/' })
 
     res.json({
       success: true,

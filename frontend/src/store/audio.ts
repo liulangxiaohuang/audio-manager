@@ -551,9 +551,10 @@ export const useAudioStore = defineStore('audio', () => {
       
       await loadFavorites();
       updateFavoriteFoldersCount();
+      console.log(111111, response.data)
       
       showNotification(
-        response.data.favoriteFolders.includes(folderName) ? '已添加到收藏' : '已从收藏移除',
+        response.data.isFavorite ? '已添加到收藏' : '已从收藏移除',
         'success'
       );
     } catch (error) {
@@ -565,7 +566,7 @@ export const useAudioStore = defineStore('audio', () => {
   const updateFavoriteFoldersCount = () => {
     favoriteFolders.value.forEach(folder => {
       folder.count = favorites.value.filter(audio => 
-        audio.favoriteFolders.includes(folder.id)
+        audio.favoriteFolders[folder.id]
       ).length;
     });
   };

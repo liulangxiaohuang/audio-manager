@@ -28,7 +28,7 @@
       </button>
     </div>
 
-    <div class="view-actions" style="display: block;">
+    <div class="view-actions" style="display: none;">
       <div class="view-info">
         <!-- <h2>{{ currentFolderName }}</h2>
         <p v-if="audioStore.currentFolder">路径: {{ audioStore.currentFolder }}</p>
@@ -37,46 +37,6 @@
         <!-- <p v-if="audioStore.searchQuery">搜索: "{{ audioStore.searchQuery }}" - 找到 {{ audioFiles.length }} 个结果</p>
         <p v-else-if="audioStore.currentFolder">路径: {{ audioStore.currentFolder }}</p> -->
         <!-- <p v-else>根目录</p> -->
-      </div>
-      
-      <div class="action-buttons" v-if="audioFiles.length">
-        <!-- 多选模式开关 -->
-        <button 
-          class="btn-secondary" 
-          @click="toggleMultiSelect"
-          :class="{ 'active': multiSelectMode }"
-        >
-          <CheckSquareIcon :size="16" />
-          {{ multiSelectMode ? '退出多选' : '多选' }}
-        </button>
-
-        <!-- 全选按钮，只在多选模式下显示 -->
-        <button 
-          v-if="multiSelectMode" 
-          class="btn-secondary" 
-          @click="selectAll"
-        >
-          <CheckIcon :size="16" />
-          {{ selectedItems.size === allSelectableItems.length ? '取消全选' : '全选' }}
-        </button>
-        
-        <button 
-          v-if="multiSelectMode && selectedItems.size > 0" 
-          class="btn-primary"
-          @click="batchAddToFavorites"
-        >
-          <StarIcon :size="16" />
-          批量收藏 ({{ selectedItems.size }})
-        </button>
-        
-        <button 
-          v-if="multiSelectMode && selectedItems.size > 0 && hasSelectedAudios" 
-          class="btn-danger"
-          @click="batchDelete"
-        >
-          <Trash2Icon :size="16" />
-          批量删除 ({{ selectedAudioCount }})
-        </button>
       </div>
     </div>
 
@@ -113,12 +73,8 @@
           <h3 v-else>音频文件 ({{ audioFiles.length }})</h3>
         </div>
         
-        <AudioList 
+        <AudioList
           :audios="audioFiles"
-          :selected-audios="selectedItems"
-          :show-checkbox="multiSelectMode"
-          @select="toggleSelect"
-          @play="playAudio"
         />
       </div>
 
@@ -136,41 +92,23 @@
         </button>
       </div>
     </div>
-
-    <ConfirmModal 
-      v-if="showDeleteConfirm"
-      title="删除音频"
-      :message="`确定要删除所选的${selectedAudioCount}个音频吗？此操作不可撤销。`"
-      confirm-text="删除"
-      @close="showDeleteConfirm = false"
-      @confirm="handleDeleteConfirm"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useAudioStore } from '@/store/audio'
 import { 
   HomeIcon, 
   ChevronRightIcon, 
   FolderIcon, 
   FolderOpenIcon, 
-  StarIcon, 
-  Trash2Icon,
-  CheckSquareIcon,
-  CheckIcon,
   SearchIcon
 } from 'lucide-vue-next'
 import AudioList from '@/components/AudioList.vue'
-import ConfirmModal from '@/components/ConfirmModal.vue'
 import type { AudioFile, FolderItem } from '@/types/audio'
+import { useAudioStore } from '@/store/audio'
 
 const audioStore = useAudioStore()
-
-const selectedItems = ref<Set<string>>(new Set())
-const multiSelectMode = ref(false)
-const showDeleteConfirm = ref(false)
 
 const folders = computed(() => {
   // 搜索状态下不显示文件夹
@@ -185,22 +123,6 @@ const audioFiles = computed(() => {
 const currentFolderName = computed(() => {
   if (audioStore.currentPath.length === 0) return '根目录'
   return audioStore.currentPath[audioStore.currentPath.length - 1]
-})
-
-const allSelectableItems = computed(() => {
-  return [...audioFiles.value]
-})
-
-const hasSelectedAudios = computed(() => {
-  return Array.from(selectedItems.value).some(id => 
-    audioFiles.value.some(audio => audio._id === id)
-  )
-})
-
-const selectedAudioCount = computed(() => {
-  return Array.from(selectedItems.value).filter(id => 
-    audioFiles.value.some(audio => audio._id === id)
-  ).length
 })
 
 const currentViewTitle = computed(() => {
@@ -225,16 +147,6 @@ const emptyStateMessage = computed(() => {
   return '此文件夹中没有内容'
 })
 
-
-// 监听搜索状态变化
-watch(() => audioStore.searchQuery, async (newQuery) => {
-  if (newQuery) {
-    // 搜索状态下，清除多选模式
-    multiSelectMode.value = false
-    selectedItems.value.clear()
-  }
-})
-
 onMounted(() => {
   // 初始化时加载当前文件夹内容
   audioStore.loadFolderContents(audioStore.currentFolder)
@@ -243,72 +155,15 @@ onMounted(() => {
 // 修复：只有一个 enterFolder 函数定义
 const enterFolder = (folder: FolderItem) => {
   audioStore.navigateToFolder(folder.name)
-  selectedItems.value.clear()
-  multiSelectMode.value = false
 }
 
 const navigateToPath = (index: number) => {
   const targetPath = audioStore.currentPath.slice(0, index + 1).join('/')
   audioStore.setCurrentFolder(targetPath)
-  selectedItems.value.clear()
-  multiSelectMode.value = false
 }
 
 const navigateToRoot = () => {
   audioStore.navigateToRoot()
-  selectedItems.value.clear()
-  multiSelectMode.value = false
-}
-
-const toggleMultiSelect = () => {
-  multiSelectMode.value = !multiSelectMode.value
-  if (!multiSelectMode.value) {
-    // 退出多选模式时清空选择
-    selectedItems.value.clear()
-  }
-}
-
-const toggleSelect = (audio: AudioFile) => {
-  if (selectedItems.value.has(audio._id)) {
-    selectedItems.value.delete(audio._id)
-  } else {
-    selectedItems.value.add(audio._id)
-  }
-}
-
-const selectAll = () => {
-  if (selectedItems.value.size === allSelectableItems.value.length) {
-    selectedItems.value.clear()
-  } else {
-    selectedItems.value = new Set(allSelectableItems.value.map(audio => audio._id))
-  }
-}
-
-const batchAddToFavorites = () => {
-  selectedItems.value.forEach(audioId => {
-    const audio = audioFiles.value.find(a => a._id === audioId)
-    if (audio) {
-      audioStore.toggleFavorite(audioId, 'default')
-    }
-  })
-  selectedItems.value.clear()
-}
-
-const batchDelete = () => {
-  showDeleteConfirm.value = true
-}
-
-const playAudio = (audio: AudioFile) => {
-  console.log('播放音频:', audio.name)
-  // 实现播放逻辑
-}
-
-const handleDeleteConfirm = () => {
-  selectedItems.value.forEach(audioId => {
-    audioStore.deleteAudio(audioId)
-  })
-  selectedItems.value.clear()
-  showDeleteConfirm.value = false
 }
 </script>
 
@@ -383,61 +238,6 @@ const handleDeleteConfirm = () => {
   color: var(--text-secondary);
   margin: 0;
   font-size: 14px;
-}
-
-.action-buttons {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.btn-secondary,
-.btn-primary,
-.btn-danger {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.3s ease;
-}
-
-.btn-secondary {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
-
-.btn-secondary:hover {
-  background: var(--hover-bg);
-  border-color: var(--text-secondary);
-}
-
-.btn-secondary.active {
-  background: var(--primary-color);
-  color: white;
-  border-color: var(--primary-color);
-}
-
-.btn-primary {
-  background: var(--primary-color);
-  color: white;
-}
-
-.btn-primary:hover {
-  opacity: 0.9;
-}
-
-.btn-danger {
-  background: var(--error-color);
-  color: white;
-}
-
-.btn-danger:hover {
-  opacity: 0.9;
 }
 
 .folder-content {
